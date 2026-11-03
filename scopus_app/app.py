@@ -103,12 +103,20 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
             return {}
 
     def do_GET(self):
-        if not self._is_authenticated():
-            return self._send_auth_required()
-
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query_params = urllib.parse.parse_qs(parsed.query)
+
+        # Cloud health check endpoint (bypasses password so host monitoring sees 200 OK)
+        if path in ("/health", "/api/health"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+            return
+
+        if not self._is_authenticated():
+            return self._send_auth_required()
 
         if path == "/api/bootstrap":
             return self._handle_bootstrap()
