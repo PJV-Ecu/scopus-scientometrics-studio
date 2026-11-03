@@ -1,0 +1,26 @@
+# Local R workspace & large media files
+worksopace.RData
+.RData
+.Rhistory
+.Renviron
+*.mp4
+__pycache__/
+*.pyc
+
+# Legacy exploratory plots & image artifacts
+plot*.png
+plot*.pdf
+plot*.svg
+Rplot*.jpeg
+Wordcloud_*.png
+Wordcloud_*.svg
+wordcloud_*.png
+
+# Exploratory R test scripts (already integrated into scopus_app)
+script*.R
+plot*.R
+
+# Intermediate duplicate spreadsheets (the app uses scopus_app/data/scopus_studio.db)
+INABIO_Publications_*
+Publicaciones_SCOPUS_*
+Reporte de publicaciones*

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scopus Productivity & Aesthetic Graph Studio</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 36 36" width="32" height="32">
+          <rect x="2" y="2" width="32" height="32" rx="8" fill="#d97706" opacity="0.18"/>
+          <circle cx="26" cy="11" r="4" fill="#d97706"/>
+          <line x1="8" y1="11" x2="23" y2="11" stroke="#d97706" stroke-width="3.2" stroke-linecap="round"/>
+          <circle cx="21" cy="18" r="4" fill="#0d9488"/>
+          <line x1="8" y1="18" x2="18" y2="18" stroke="#0d9488" stroke-width="3.2" stroke-linecap="round"/>
+          <circle cx="15" cy="25" r="4" fill="#e11d48"/>
+          <line x1="8" y1="25" x2="12" y2="25" stroke="#e11d48" stroke-width="3.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Scopus Scientometrics Studio</h1>
+        <p class="subtitle">Evaluación Automatizada de Productividad Científica &amp; Gráficos de Publicación</p>
+      </div>
+    </div>
+
+    <nav class="main-tabs" role="tablist">
+      <button class="tab-btn active" data-tab="tab-compare" role="tab">
+        <span class="tab-icon">📊</span> Comparativa &amp; Gráficos
+      </button>
+      <button class="tab-btn" data-tab="tab-harvest" role="tab">
+        <span class="tab-icon">📚</span> Cosechador de Artículos
+      </button>
+      <button class="tab-btn" data-tab="tab-wordcloud" role="tab">
+        <span class="tab-icon">☁️</span> Nubes de Palabras &amp; Texto
+      </button>
+      <button class="tab-btn" data-tab="tab-settings" role="tab">
+        <span class="tab-icon">⚙️</span> Instituciones &amp; API Key
+      </button>
+    </nav>
+
+    <div class="api-status-pill" id="apiStatusPill" title="Estado de la clave API de Scopus">
+      <span class="status-dot" id="apiStatusDot"></span>
+      <span id="apiStatusText">Verificando API...</span>
+    </div>
+  </header>
+
+  <!-- Global Background Job Banner -->
+  <div id="jobProgressBanner" class="job-banner hidden">
+    <div class="job-banner-header">
+      <div>
+        <strong id="jobBannerTitle">Consultando Scopus...</strong>
+        <span id="jobBannerMessage" class="job-msg">Iniciando...</span>
+      </div>
+      <div class="job-banner-actions">
+        <span id="jobBannerPercent" class="job-pct">0%</span>
+        <button id="jobCancelBtn" class="btn btn-sm btn-danger">Cancelar</button>
+      </div>
+    </div>
+    <div class="progress-track">
+      <div id="jobProgressBar" class="progress-fill" style="width: 0%"></div>
+    </div>
+    <details class="job-logs-details">
+      <summary>Ver registro detallado en tiempo real</summary>
+      <pre id="jobLogsConsole" class="job-logs-pre"></pre>
+    </details>
+  </div>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="app-main">
+
+    <!-- ==================== TAB 1: COMPARATIVE PRODUCTIVITY & GRAPH STUDIO ==================== -->
+    <section id="tab-compare" class="tab-panel active">
+      <div class="workspace-grid">
+        <!-- Left Sidebar: Saved Runs & New Query Builder -->
+        <aside class="sidebar-panel">
+          <div class="card">
+            <div class="card-header">
+              <h2>1. Conjuntos de Datos / Consultas</h2>
+              <button id="btnOpenNewComparison" class="btn btn-sm btn-primary">+ Nueva Consulta Scopus</button>
+            </div>
+            <div class="form-group">
+              <label for="selectComparisonRun">Evaluación activa:</label>
+              <select id="selectComparisonRun" class="input-select"></select>
+            </div>
+            <div id="comparisonRunMeta" class="meta-summary-box"></div>
+            <div class="btn-row">
+              <a id="btnExportCompCsv" class="btn btn-sm btn-outline" href="#" download>⬇ CSV</a>
+              <a id="btnExportCompXlsx" class="btn btn-sm btn-outline" href="#" download>⬇ Excel (.xlsx)</a>
+              <button id="btnDeleteCompRun" class="btn btn-sm btn-ghost-danger" title="Eliminar esta consulta">🗑</button>
+            </div>
+          </div>
+
+          <!-- Collapsible Live Scopus Multi-Institution Query Builder -->
+          <div id="newComparisonCard" class="card accent-card hidden">
+            <div class="card-header">
+              <h2>Ejecutar Consulta Masiva en Scopus</h2>
+              <button id="btnCloseNewComparison" class="btn-close" title="Cerrar">✕</button>
+            </div>
+
+            <div class="form-group">
+              <label for="compQueryTitle">Título del reporte:</label>
+              <input type="text" id="compQueryTitle" class="input-text" placeholder="Ej. Publicaciones en todas las áreas (2025)" />
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="compQueryYear">Año (o rango):</label>
+                <input type="text" id="compQueryYear" class="input-text" value="2025" placeholder="2025 o 2020-2025" />
+              </div>
+              <div class="form-group">
+                <label for="compQuerySubj">Área temática Scopus:</label>
+                <select id="compQuerySubj" class="input-select"></select>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <label class="checkbox-label">
+                <input type="checkbox" id="compQueryOA" />
+                Solo Acceso Abierto (<code>ACCESSTYPE(OA)</code>)
+              </label>
+              <div class="form-group inline-group">
+                <label for="compSleepTime">Pausa (s):</label>
+                <input type="number" id="compSleepTime" class="input-text input-xs" value="0.5" min="0.1" max="5" step="0.1" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Seleccionar instituciones a consultar (<span id="selectedInstCount">0</span> seleccionadas):</label>
+              <div class="preset-pills">
+                <button type="button" class="pill-btn" data-preset="institutes">Institutos Públicos (6)</button>
+                <button type="button" class="pill-btn" data-preset="agri6">Grupo AGRI (6)</button>
+                <button type="button" class="pill-btn" data-preset="public_univ">Univ. Públicas</button>
+                <button type="button" class="pill-btn" data-preset="private_univ">Univ. Privadas</button>
+                <button type="button" class="pill-btn" data-preset="all_univ">63 Universidades</button>
+                <button type="button" class="pill-btn" data-preset="none">Limpiar</button>
+              </div>
+              <input type="text" id="instFilterSearch" class="input-text input-sm" placeholder="Filtrar por nombre o ciudad (ej. Quito, Guayaquil)..." />
+              <div id="instChecklist" class="checklist-box"></div>
+            </div>
+
+            <div class="query-preview-box">
+              <span class="preview-label">Vista previa sintaxis Scopus:</span>
+              <code id="compQueryPreview">AFFIL("...") AND PUBYEAR = 2025</code>
+            </div>
+
+            <button id="btnRunComparisonJob" class="btn btn-primary btn-block">
+              🚀 Ejecutar Consulta en SCOPUS
+            </button>
+          </div>
+
+          <!-- Aesthetic Graph Controls Card -->
+          <div class="card">
+            <div class="card-header">
+              <h2>2. Diseño y Estilo del Gráfico</h2>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="chartTypeSelect">Tipo de gráfico:</label>
+                <select id="chartTypeSelect" class="input-select">
+                  <option value="lollipop">Lollipop Horizontal (Clásico Scopus)</option>
+                  <option value="hbar">Barras Horizontales</option>
+                  <option value="vbar">Columnas Verticales (ggplot)</option>
+                  <option value="radial">Circular / Radial Bar Plot</option>
+                  <option value="city_summary">Agrupado por Ciudad y Sector</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="chartThemeSelect">Tema estético:</label>
+                <select id="chartThemeSelect" class="input-select">
+                  <option value="pomological">Pomological Painted (Vintage / Bears)</option>
+                  <option value="solarized_light">Solarized Light (theme_solarized_2)</option>
+                  <option value="editorial">Nature / Science Editorial</option>
+                  <option value="solarized_dark">Solarized Dark Observatory</option>
+                  <option value="sector_split">Públicas vs. Privadas (Bicolor)</option>
+                  <option value="viridis">Viridis Científico</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="chartTitleInput">Título del gráfico:</label>
+              <input type="text" id="chartTitleInput" class="input-text" />
+            </div>
+
+            <div class="form-group">
+              <label for="chartSubtitleInput">Subtítulo:</label>
+              <input type="text" id="chartSubtitleInput" class="input-text" />
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="chartXLabelInput">Etiqueta eje X (Valores):</label>
+                <input type="text" id="chartXLabelInput" class="input-text" value="Número de publicaciones Scopus" />
+              </div>
+              <div class="form-group">
+                <label for="chartYLabelInput">Etiqueta eje Y (Instituciones):</label>
+                <input type="text" id="chartYLabelInput" class="input-text" value="Instituciones de investigación / IES" />
+              </div>
+            </div>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label for="chartTopN">Mostrar Top N:</label>
+                <select id="chartTopN" class="input-select">
+                  <option value="999">Todas</option>
+                  <option value="10">Top 10</option>
+                  <option value="15">Top 15</option>
+                  <option value="25">Top 25</option>
+                  <option value="40">Top 40</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="chartSectorFilter">Sector:</label>
+                <select id="chartSectorFilter" class="input-select">
+                  <option value="ALL">Todos</option>
+                  <option value="Public">Públicas</option>
+                  <option value="Private">Privadas</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="chartCityFilter">Ciudad:</label>
+                <select id="chartCityFilter" class="input-select">
+                  <option value="ALL">Todas</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="chartRefLineMode">Línea de referencia (<code>vline</code>):</label>
+                <select id="chartRefLineMode" class="input-select">
+                  <option value="custom">Valor personalizado</option>
+                  <option value="mean">Promedio (Media)</option>
+                  <option value="median">Mediana</option>
+                  <option value="max">Máximo nacional</option>
+                  <option value="none">Ocultar línea</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="chartRefLineVal">Valor <code>xintercept</code>:</label>
+                <input type="number" id="chartRefLineVal" class="input-text" value="65" step="1" />
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="chartAspectSelect">Proporción (Lienzo):</label>
+                <select id="chartAspectSelect" class="input-select">
+                  <option value="golden">Proporción Áurea (13.14 × 8.12)</option>
+                  <option value="tall">Vertical Extendido (Universidades)</option>
+                  <option value="wide">Panorámico 16:9</option>
+                  <option value="square">Cuadrado 1:1</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="chartFontSelect">Tipografía:</label>
+                <select id="chartFontSelect" class="input-select">
+                  <option value="Georgia, 'Times New Roman', serif"> Académica Serif (Georgia)</option>
+                  <option value="'Inter', system-ui, -apple-system, sans-serif">Moderna Sans (Inter/System)</option>
+                  <option value="'Palatino Linotype', 'Book Antiqua', Palatino, serif">Pomological Clásica (Palatino)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="checkbox-grid">
+              <label class="checkbox-label">
+                <input type="checkbox" id="chartShowValues" checked />
+                Mostrar cifras exactas
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chartPaintedEffect" checked />
+                Textura acuarela/papel (Pomological)
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chartHideZero" />
+                Ocultar instituciones con 0
+              </label>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Right Main Stage: Interactive SVG Graph + Data Table -->
+        <div class="stage-panel">
+          <div class="card stage-card">
+            <div class="stage-toolbar">
+              <div class="kpi-strip" id="comparisonKpiStrip"></div>
+              <div class="export-buttons">
+                <button id="btnDownloadSvg" class="btn btn-sm btn-outline" title="Descargar gráfico vectorial SVG">
+                  🖼 Descargar SVG
+                </button>
+                <button id="btnDownloadPng" class="btn btn-sm btn-primary" title="Descargar imagen PNG a 300 DPI">
+                  📸 Descargar PNG (300 DPI)
+                </button>
+              </div>
+            </div>
+
+            <!-- SVG Chart Container -->
+            <div id="chartCanvasContainer" class="chart-canvas-wrapper"></div>
+          </div>
+
+          <!-- Ranked Data Table Below Chart -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Tabla de Resultados Clasificados</h2>
+              <input type="text" id="compTableSearch" class="input-text input-sm" placeholder="Buscar institución o ciudad..." style="max-width: 260px;" />
+            </div>
+            <div class="table-scroll">
+              <table class="data-table" id="comparisonDataTable">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Institución</th>
+                    <th>Categoría</th>
+                    <th>Sector</th>
+                    <th>Ciudad</th>
+                    <th class="num-col">Publicaciones</th>
+                    <th class="num-col">% del Total</th>
+                    <th>Consulta Scopus</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: DETAILED PUBLICATION HARVESTER ==================== -->
+    <section id="tab-harvest" class="tab-panel">
+      <div class="workspace-grid">
+        <aside class="sidebar-panel">
+          <div class="card">
+            <div class="card-header">
+              <h2>1. Bases de Artículos Descargadas</h2>
+            </div>
+            <div class="form-group">
+              <label for="selectHarvestDataset">Seleccionar base de publicaciones:</label>
+              <select id="selectHarvestDataset" class="input-select"></select>
+            </div>
+            <div id="harvestDatasetMeta" class="meta-summary-box"></div>
+            <div class="btn-row">
+              <a id="btnExportDatasetCsv" class="btn btn-sm btn-outline" href="#" download>⬇ Exportar CSV</a>
+              <a id="btnExportDatasetXlsx" class="btn btn-sm btn-primary" href="#" download>⬇ Exportar Excel (.xlsx)</a>
+              <button id="btnSendToWordcloud" class="btn btn-sm btn-outline">☁️ Crear Nube de Palabras</button>
+              <button id="btnDeleteDataset" class="btn btn-sm btn-ghost-danger" title="Eliminar dataset">🗑</button>
+            </div>
+          </div>
+
+          <div class="card accent-card">
+            <div class="card-header">
+              <h2>2. Cosechar Artículos desde Scopus</h2>
+            </div>
+            <p class="helper-text">
+              Descarga por lotes (paginación automática) los artículos completos de una institución con títulos, revistas, fechas, ISSN/ISBN, áreas del conocimiento, autores, afiliaciones y DOI (equivalente a <code>script8</code>–<code>script10</code>).
+            </p>
+
+            <div class="form-group">
+              <label for="harvestInstSelect">Institución objetivo:</label>
+              <select id="harvestInstSelect" class="input-select"></select>
+            </div>
+
+            <div class="form-group">
+              <label for="harvestCustomInst">O escribir afiliación exacta:</label>
+              <input type="text" id="harvestCustomInst" class="input-text" placeholder="Ej. Instituto Nacional de Biodiversidad" />
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="harvestYear">Año:</label>
+                <input type="text" id="harvestYear" class="input-text" value="2025" />
+              </div>
+              <div class="form-group">
+                <label for="harvestSubj">Área Scopus:</label>
+                <select id="harvestSubj" class="input-select"></select>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="harvestViewMode">Nivel de vista API:</label>
+                <select id="harvestViewMode" class="input-select">
+                  <option value="STANDARD">STANDARD (Compatible con toda API Key)</option>
+                  <option value="COMPLETE">COMPLETE (Áreas detalladas + vínculo Autor-AFID)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="harvestMaxRecords">Máx. artículos:</label>
+                <input type="number" id="harvestMaxRecords" class="input-text" value="500" min="25" max="2000" step="25" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="harvestTargetPattern">Patrón regex para aislar autores propios:</label>
+              <input type="text" id="harvestTargetPattern" class="input-text" value="Instituto Nacional de Biodiversidad|INABIO" />
+            </div>
+
+            <label class="checkbox-label" style="margin-bottom: 12px;">
+              <input type="checkbox" id="harvestOAOnly" />
+              Solo Acceso Abierto (<code>ACCESSTYPE(OA)</code>)
+            </label>
+
+            <button id="btnRunHarvestJob" class="btn btn-primary btn-block">
+              📥 Iniciar Descarga de Publicaciones
+            </button>
+          </div>
+        </aside>
+
+        <div class="stage-panel">
+          <!-- Top Journals Breakdown for Selected Dataset -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Distribución por Revistas Científicas (Top 12)</h2>
+              <div id="datasetKpiPills" class="kpi-strip"></div>
+            </div>
+            <div id="datasetJournalsChart" class="mini-chart-container"></div>
+          </div>
+
+          <!-- Publications Table -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Catálogo de Artículos Científicos</h2>
+              <input type="text" id="pubTableSearch" class="input-text input-sm" placeholder="Filtrar por título, revista, autor, afiliación o DOI..." style="max-width: 340px;" />
+            </div>
+            <div class="table-scroll">
+              <table class="data-table" id="publicationsDataTable">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Título del Artículo</th>
+                    <th>Revista (Journal)</th>
+                    <th>Fecha</th>
+                    <th>ISSN/ISBN</th>
+                    <th>Autores</th>
+                    <th>Afiliaciones Coautoras</th>
+                    <th>DOI</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: WORD CLOUD & TEXT ANALYTICS STUDIO ==================== -->
+    <section id="tab-wordcloud" class="tab-panel">
+      <div class="workspace-grid">
+        <aside class="sidebar-panel">
+          <div class="card">
+            <div class="card-header">
+              <h2>Configuración de Nube de Palabras</h2>
+            </div>
+            <p class="helper-text">
+              Genera nubes de palabras vectoriales de alta resolución y gráficos de frecuencia a partir de títulos, revistas científicas, instituciones colaboradoras o autores (evolución de <code>script_wordcloud.R</code>).
+            </p>
+
+            <div class="form-group">
+              <label for="wcDatasetSelect">Base de publicaciones:</label>
+              <select id="wcDatasetSelect" class="input-select"></select>
+            </div>
+
+            <div class="form-group">
+              <label for="wcSourceField">Campo de análisis textual:</label>
+              <select id="wcSourceField" class="input-select">
+                <option value="article_name">Títulos de Artículos (Palabras clave)</option>
+                <option value="journal_name">Revistas Científicas (Palabras)</option>
+                <option value="affiliations">Instituciones Coautoras (Entidades)</option>
+                <option value="authors_list">Autores e Investigadores (Entidades)</option>
+              </select>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="wcPaletteSelect">Paleta de color:</label>
+                <select id="wcPaletteSelect" class="input-select">
+                  <option value="paired">RColorBrewer Paired (Clásico R)</option>
+                  <option value="pomological">Pomological Botanical</option>
+                  <option value="set2">Pastel Profesional (Set2)</option>
+                  <option value="solarized">Solarized Accent</option>
+                  <option value="viridis">Viridis Deep</option>
+                  <option value="dark2">Editorial Dark2</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="wcBgSelect">Fondo del lienzo:</label>
+                <select id="wcBgSelect" class="input-select">
+                  <option value="#ffffff">Blanco Puro (#FFFFFF)</option>
+                  <option value="#fdf6e3">Solarized Crema (#FDF6E3)</option>
+                  <option value="#fbf5e6">Pergamino Pomological (#FBF5E6)</option>
+                  <option value="#0f172a">Oscuro Nocturno (#0F172A)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label for="wcMaxWords">Máx. palabras:</label>
+                <input type="number" id="wcMaxWords" class="input-text" value="110" min="20" max="200" step="10" />
+              </div>
+              <div class="form-group">
+                <label for="wcMinFreq">Frec. mín.:</label>
+                <input type="number" id="wcMinFreq" class="input-text" value="1" min="1" max="20" />
+              </div>
+              <div class="form-group">
+                <label for="wcRotPer">% Vertical:</label>
+                <input type="number" id="wcRotPer" class="input-text" value="12" min="0" max="50" step="5" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="wcExtraStopwords">Palabras a excluir (separadas por coma):</label>
+              <input type="text" id="wcExtraStopwords" class="input-text" placeholder="Ej. journal, universidad, study..." />
+            </div>
+
+            <button id="btnGenerateWordcloud" class="btn btn-primary btn-block">
+              ✨ Regenerar Nube de Palabras
+            </button>
+          </div>
+        </aside>
+
+        <div class="stage-panel">
+          <div class="card stage-card">
+            <div class="stage-toolbar">
+              <div>
+                <h2 id="wcStageTitle">Nube de Palabras</h2>
+                <span id="wcStageSubtitle" class="helper-text"></span>
+              </div>
+              <div class="export-buttons">
+                <button id="btnDownloadWcSvg" class="btn btn-sm btn-outline">🖼 Descargar SVG</button>
+                <button id="btnDownloadWcPng" class="btn btn-sm btn-primary">📸 Descargar PNG (1200×1200)</button>
+              </div>
+            </div>
+            <div id="wordcloudCanvasWrapper" class="wordcloud-wrapper"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Top 25 Términos / Entidades Más Frecuentes</h2>
+            </div>
+            <div id="wcTopTermsBarChart" class="mini-chart-container"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: INSTITUTIONS & API SETTINGS ==================== -->
+    <section id="tab-settings" class="tab-panel">
+      <div class="workspace-grid">
+        <aside class="sidebar-panel">
+          <div class="card">
+            <div class="card-header">
+              <h2>Credenciales de Scopus API</h2>
+            </div>
+            <p class="helper-text">
+              La aplicación detecta automáticamente la clave de tu entorno R (<code>worksopace.RData</code> / <code>.Renviron</code>). Puedes verificar la conexión o actualizar tu clave de Elsevier Developer Portal aquí.
+            </p>
+            <div class="form-group">
+              <label for="settingsApiKey">Scopus API Key (<code>X-ELS-APIKey</code>):</label>
+              <input type="text" id="settingsApiKey" class="input-text" placeholder="Ingresa tu clave de 32 caracteres hexadecimales" />
+            </div>
+            <div class="form-group">
+              <label for="settingsInstToken">Institution Token (<code>X-ELS-Insttoken</code> - Opcional):</label>
+              <input type="text" id="settingsInstToken" class="input-text" placeholder="Solo requerido para suscriptores COMPLETE fuera de red" />
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="settingsSleepTime">Pausa entre lotes (s):</label>
+                <input type="number" id="settingsSleepTime" class="input-text" value="1.0" step="0.2" min="0.1" max="10" />
+              </div>
+              <div class="form-group">
+                <label for="settingsDefaultView">Vista predeterminada:</label>
+                <select id="settingsDefaultView" class="input-select">
+                  <option value="STANDARD">STANDARD</option>
+                  <option value="COMPLETE">COMPLETE</option>
+                </select>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button id="btnSaveSettings" class="btn btn-primary">💾 Guardar Configuración</button>
+              <button id="btnTestApiKey" class="btn btn-outline">🔌 Probar Conexión Scopus</button>
+            </div>
+            <div id="apiTestResultBox" class="alert-box hidden"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2>Añadir Institución al Directorio</h2>
+            </div>
+            <div class="form-group">
+              <label for="newInstName">Nombre oficial en Scopus (<code>AFFIL</code>):</label>
+              <input type="text" id="newInstName" class="input-text" placeholder="Ej. Charles Darwin Foundation" />
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="newInstCategory">Categoría:</label>
+                <select id="newInstCategory" class="input-select">
+                  <option value="University">Universidad (IES)</option>
+                  <option value="Research Institute">Instituto Público de Investigación</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="newInstType">Financiamiento:</label>
+                <select id="newInstType" class="input-select">
+                  <option value="Public">Pública</option>
+                  <option value="Private">Privada</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="newInstCity">Ciudad:</label>
+                <input type="text" id="newInstCity" class="input-text" placeholder="Ej. Quito" />
+              </div>
+              <div class="form-group">
+                <label for="newInstAfid">Scopus AF-ID (Opcional):</label>
+                <input type="text" id="newInstAfid" class="input-text" placeholder="Ej. 60006514" />
+              </div>
+            </div>
+            <button id="btnAddInstitution" class="btn btn-primary btn-block">+ Guardar Institución</button>
+          </div>
+        </aside>
+
+        <div class="stage-panel">
+          <div class="card">
+            <div class="card-header">
+              <h2>Directorio Nacional de Universidades e Institutos (<span id="dirTotalCount">0</span>)</h2>
+              <input type="text" id="dirSearchInput" class="input-text input-sm" placeholder="Buscar por nombre, ciudad o tipo..." style="max-width: 280px;" />
+            </div>
+            <div class="table-scroll">
+              <table class="data-table" id="institutionsDirTable">
+                <thead>
+                  <tr>
+                    <th>Nombre Oficial de Afiliación (Scopus)</th>
+                    <th>Categoría</th>
+                    <th>Sector</th>
+                    <th>Ciudad</th>
+                    <th>AF-ID</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+
