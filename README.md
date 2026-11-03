@@ -5,6 +5,8 @@
 
 An automated scientometrics web application for querying the **Elsevier Scopus API**, evaluating institutional research productivity (universities and research institutes), and generating publication-ready aesthetic data visualizations.
 
+<img width="1886" height="1062" alt="2026-11-03 15 36 54" src="https://github.com/user-attachments/assets/2d879435-76c6-4ef4-85fe-b103fb7ccf4b" />
+
 Built with a **zero-dependency Python 3.10+ standard library backend** and an interactive, responsive web frontend.
 
 ---
