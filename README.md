@@ -1,5 +1,8 @@
 # Scopus Scientometrics & Aesthetic Graph Studio 📊
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+
 An automated scientometrics web application for querying the **Elsevier Scopus API**, evaluating institutional research productivity (universities and research institutes), and generating publication-ready aesthetic data visualizations.
 
 Built with a **zero-dependency Python 3.10+ standard library backend** and an interactive, responsive web frontend.
@@ -65,4 +68,4 @@ The application can read credentials from the web UI (`Settings` tab) or via env
 ---
 
 ## 📄 License
-This project is open-source and available under the [MIT License](LICENSE).
+This project is open-source and licensed under the [GNU Affero General Public License v3.0 (GNU AGPLv3)](LICENSE).
