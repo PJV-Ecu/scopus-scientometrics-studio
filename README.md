@@ -3,7 +3,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 
-An automated scientometrics web application for querying the **Elsevier Scopus API**, evaluating institutional research productivity (universities and research institutes), and generating publication-ready aesthetic data visualizations.
+An automated scientometrics web application for querying the **Elsevier Scopus API**, evaluating institutional research productivity (universities and research institutes), and generating publication-ready aesthetic data visualizations. Built with the assistance of Gemini Antigravity.
 
 <img width="1886" height="1062" alt="2026-11-03 15 36 54" src="https://github.com/user-attachments/assets/2d879435-76c6-4ef4-85fe-b103fb7ccf4b" />
 
