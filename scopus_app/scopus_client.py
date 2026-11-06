@@ -68,9 +68,10 @@ def get_settings() -> dict:
     return settings
 
 
-# Institution-specific Scopus disambiguation rules for institutions with international homonyms
+# Institution-specific Scopus disambiguation rules for institutions with international homonyms or non-standard indexed names:
 # - ROR 01yg1g961: Universidad Nacional de Educación (UNAE, Azogues, Ecuador) vs UNED (Madrid, Spain)
 # - ROR 0198j4566: Universidad de Las Américas (UDLA, Quito, Ecuador, AF-ID 60104441) vs UDLA Chile & UDLAP Mexico
+# - ROR 04jjswc10: Yachay Tech (AF-ID 60105012, indexed in Scopus as "Yachay University for Experimental Technology and Research (Yachay Tech)")
 INSTITUTION_DISAMBIGUATION_RULES = {
     "universidad nacional de educación": {
         "ror_id": "01yg1g961",
@@ -81,6 +82,16 @@ INSTITUTION_DISAMBIGUATION_RULES = {
         "ror_id": "0198j4566",
         "afid": "60104441",
         "clause": "AF-ID(60104441)",
+    },
+    "universidad de investigación de tecnología experimental yachay": {
+        "ror_id": "04jjswc10",
+        "afid": "60105012",
+        "clause": '(AF-ID(60105012) OR (AFFIL("Yachay") AND AFFILCOUNTRY(Ecuador)))',
+    },
+    "yachay tech": {
+        "ror_id": "04jjswc10",
+        "afid": "60105012",
+        "clause": '(AF-ID(60105012) OR (AFFIL("Yachay") AND AFFILCOUNTRY(Ecuador)))',
     },
     "universidad metropolitana": {
         "ror_id": "",

@@ -883,6 +883,8 @@ function updateQueryPreview() {
       ? `(AFFIL("Universidad Nacional de Educación") AND AFFIL("Azogues"))`
       : normSample === "universidad de las américas"
       ? `AF-ID(60104441)`
+      : normSample.includes("yachay")
+      ? `(AF-ID(60105012) OR (AFFIL("Yachay") AND AFFILCOUNTRY(Ecuador)))`
       : `AFFIL("${sampleInst}") AND AFFILCOUNTRY(Ecuador)`;
   if (subj !== "ALL") q += ` AND SUBJAREA(${subj})`;
   q += ` AND PUBYEAR = ${year}`;
