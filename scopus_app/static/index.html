@@ -1,29 +1,31 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Scopus Productivity & Aesthetic Graph Studio</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
+
 <body>
   <!-- Top Navigation Header -->
   <header class="app-header">
     <div class="brand">
       <div class="brand-logo" aria-hidden="true">
         <svg viewBox="0 0 36 36" width="32" height="32">
-          <rect x="2" y="2" width="32" height="32" rx="8" fill="#d97706" opacity="0.18"/>
-          <circle cx="26" cy="11" r="4" fill="#d97706"/>
-          <line x1="8" y1="11" x2="23" y2="11" stroke="#d97706" stroke-width="3.2" stroke-linecap="round"/>
-          <circle cx="21" cy="18" r="4" fill="#0d9488"/>
-          <line x1="8" y1="18" x2="18" y2="18" stroke="#0d9488" stroke-width="3.2" stroke-linecap="round"/>
-          <circle cx="15" cy="25" r="4" fill="#e11d48"/>
-          <line x1="8" y1="25" x2="12" y2="25" stroke="#e11d48" stroke-width="3.2" stroke-linecap="round"/>
+          <rect x="2" y="2" width="32" height="32" rx="8" fill="#d97706" opacity="0.18" />
+          <circle cx="26" cy="11" r="4" fill="#d97706" />
+          <line x1="8" y1="11" x2="23" y2="11" stroke="#d97706" stroke-width="3.2" stroke-linecap="round" />
+          <circle cx="21" cy="18" r="4" fill="#0d9488" />
+          <line x1="8" y1="18" x2="18" y2="18" stroke="#0d9488" stroke-width="3.2" stroke-linecap="round" />
+          <circle cx="15" cy="25" r="4" fill="#e11d48" />
+          <line x1="8" y1="25" x2="12" y2="25" stroke="#e11d48" stroke-width="3.2" stroke-linecap="round" />
         </svg>
       </div>
       <div>
         <h1>Scopus Scientometrics Studio</h1>
-        <p class="subtitle">Evaluación Automatizada de Productividad Científica &amp; Gráficos de Publicación</p>
+        <p class="subtitle">Resolución Canónica de Entidades (Scopus AF-ID &amp; ROR) &amp; Gráficos de Publicación</p>
       </div>
     </div>
 
@@ -38,7 +40,7 @@
         <span class="tab-icon">☁️</span> Nubes de Palabras &amp; Texto
       </button>
       <button class="tab-btn" data-tab="tab-settings" role="tab">
-        <span class="tab-icon">⚙️</span> Instituciones &amp; API Key
+        <span class="tab-icon">⚙️</span> Entidades (ROR/AF-ID) &amp; API Key
       </button>
     </nav>
 
@@ -90,20 +92,22 @@
             <div class="btn-row">
               <a id="btnExportCompCsv" class="btn btn-sm btn-outline" href="#" download>⬇ CSV</a>
               <a id="btnExportCompXlsx" class="btn btn-sm btn-outline" href="#" download>⬇ Excel (.xlsx)</a>
-              <button id="btnDeleteCompRun" class="btn btn-sm btn-ghost-danger" title="Eliminar esta consulta">🗑</button>
+              <button id="btnDeleteCompRun" class="btn btn-sm btn-ghost-danger"
+                title="Eliminar esta consulta">🗑</button>
             </div>
           </div>
 
           <!-- Collapsible Live Scopus Multi-Institution Query Builder -->
           <div id="newComparisonCard" class="card accent-card hidden">
             <div class="card-header">
-              <h2>Ejecutar Consulta Masiva en Scopus</h2>
+              <h2>Consulta por Identificadores (AF-ID / ROR)</h2>
               <button id="btnCloseNewComparison" class="btn-close" title="Cerrar">✕</button>
             </div>
 
             <div class="form-group">
               <label for="compQueryTitle">Título del reporte:</label>
-              <input type="text" id="compQueryTitle" class="input-text" placeholder="Ej. Publicaciones en todas las áreas (2025)" />
+              <input type="text" id="compQueryTitle" class="input-text"
+                placeholder="Ej. Productividad Científica por AF-ID / ROR (2025)" />
             </div>
 
             <div class="form-row-2">
@@ -124,27 +128,31 @@
               </label>
               <div class="form-group inline-group">
                 <label for="compSleepTime">Pausa (s):</label>
-                <input type="number" id="compSleepTime" class="input-text input-xs" value="0.5" min="0.1" max="5" step="0.1" />
+                <input type="number" id="compSleepTime" class="input-text input-xs" value="0.5" min="0.1" max="5"
+                  step="0.1" />
               </div>
             </div>
 
             <div class="form-group">
-              <label>Seleccionar instituciones a consultar (<span id="selectedInstCount">0</span> seleccionadas):</label>
+              <label>Seleccionar entidades (<span id="selectedInstCount">0</span> IDs seleccionados):</label>
               <div class="preset-pills">
-                <button type="button" class="pill-btn" data-preset="institutes">Institutos Públicos (6)</button>
-                <button type="button" class="pill-btn" data-preset="agri6">Grupo AGRI (6)</button>
+                <button type="button" class="pill-btn" id="presetInstitutesBtn" data-preset="institutes">Institutos
+                  Públicos (7)</button>
+                <button type="button" class="pill-btn" data-preset="agri6">Grupo AGRI (6 ROR)</button>
                 <button type="button" class="pill-btn" data-preset="public_univ">Univ. Públicas</button>
                 <button type="button" class="pill-btn" data-preset="private_univ">Univ. Privadas</button>
-                <button type="button" class="pill-btn" data-preset="all_univ">63 Universidades</button>
+                <button type="button" class="pill-btn" id="presetAllUnivBtn" data-preset="all_univ">63
+                  Universidades</button>
                 <button type="button" class="pill-btn" data-preset="none">Limpiar</button>
               </div>
-              <input type="text" id="instFilterSearch" class="input-text input-sm" placeholder="Filtrar por nombre o ciudad (ej. Quito, Guayaquil)..." />
+              <input type="text" id="instFilterSearch" class="input-text input-sm"
+                placeholder="Filtrar por AF-ID, ROR, acrónimo, ciudad o etiqueta..." />
               <div id="instChecklist" class="checklist-box"></div>
             </div>
 
             <div class="query-preview-box">
-              <span class="preview-label">Vista previa sintaxis Scopus:</span>
-              <code id="compQueryPreview">AFFIL("...") AND PUBYEAR = 2025</code>
+              <span class="preview-label">Vista previa sintaxis Scopus (resuelta por ID):</span>
+              <code id="compQueryPreview">AF-ID(60104441) AND PUBYEAR = 2025</code>
             </div>
 
             <button id="btnRunComparisonJob" class="btn btn-primary btn-block">
@@ -184,6 +192,16 @@
             </div>
 
             <div class="form-group">
+              <label for="chartLabelModeSelect">Identificación de entidades en el eje:</label>
+              <select id="chartLabelModeSelect" class="input-select">
+                <option value="name_acr">Acrónimo — Etiqueta canónica (ej. IPIAP — Inst. Púb...)</option>
+                <option value="acr_id">Acrónimo + Identificador (ej. UDLA · AF-ID:60104441)</option>
+                <option value="id_only">Solo Identificador Persistente (AF-ID / ROR)</option>
+                <option value="name">Solo Etiqueta Institucional</option>
+              </select>
+            </div>
+
+            <div class="form-group">
               <label for="chartTitleInput">Título del gráfico:</label>
               <input type="text" id="chartTitleInput" class="input-text" />
             </div>
@@ -199,8 +217,8 @@
                 <input type="text" id="chartXLabelInput" class="input-text" value="Número de publicaciones Scopus" />
               </div>
               <div class="form-group">
-                <label for="chartYLabelInput">Etiqueta eje Y (Instituciones):</label>
-                <input type="text" id="chartYLabelInput" class="input-text" value="Instituciones de investigación / IES" />
+                <label for="chartYLabelInput">Etiqueta eje Y (Entidades):</label>
+                <input type="text" id="chartYLabelInput" class="input-text" value="Entidades de investigación / IES" />
               </div>
             </div>
 
@@ -263,7 +281,8 @@
                 <select id="chartFontSelect" class="input-select">
                   <option value="Georgia, 'Times New Roman', serif"> Académica Serif (Georgia)</option>
                   <option value="'Inter', system-ui, -apple-system, sans-serif">Moderna Sans (Inter/System)</option>
-                  <option value="'Palatino Linotype', 'Book Antiqua', Palatino, serif">Pomological Clásica (Palatino)</option>
+                  <option value="'Palatino Linotype', 'Book Antiqua', Palatino, serif">Pomological Clásica (Palatino)
+                  </option>
                 </select>
               </div>
             </div>
@@ -279,7 +298,7 @@
               </label>
               <label class="checkbox-label">
                 <input type="checkbox" id="chartHideZero" />
-                Ocultar instituciones con 0
+                Ocultar entidades con 0
               </label>
             </div>
           </div>
@@ -307,15 +326,18 @@
           <!-- Ranked Data Table Below Chart -->
           <div class="card">
             <div class="card-header">
-              <h2>Tabla de Resultados Clasificados</h2>
-              <input type="text" id="compTableSearch" class="input-text input-sm" placeholder="Buscar institución o ciudad..." style="max-width: 260px;" />
+              <h2>Tabla de Resultados Clasificados (Resolución por AF-ID / ROR)</h2>
+              <input type="text" id="compTableSearch" class="input-text input-sm"
+                placeholder="Buscar por AF-ID, ROR, acrónimo o ciudad..." style="max-width: 280px;" />
             </div>
             <div class="table-scroll">
               <table class="data-table" id="comparisonDataTable">
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Institución</th>
+                    <th>Identificadores (AF-ID / ROR)</th>
+                    <th>Acrónimo</th>
+                    <th>Entidad</th>
                     <th>Categoría</th>
                     <th>Sector</th>
                     <th>Ciudad</th>
@@ -355,20 +377,23 @@
 
           <div class="card accent-card">
             <div class="card-header">
-              <h2>2. Cosechar Artículos desde Scopus</h2>
+              <h2>2. Cosechar Artículos por AF-ID / ROR</h2>
             </div>
             <p class="helper-text">
-              Descarga por lotes (paginación automática) los artículos completos de una institución con títulos, revistas, fechas, ISSN/ISBN, áreas del conocimiento, autores, afiliaciones y DOI (equivalente a <code>script8</code>–<code>script10</code>).
+              Descarga por lotes los artículos completos de una entidad usando su <strong>Scopus AF-ID</strong> o
+              <strong>ROR ID</strong>, evitando ambigüedades de nombres y aislando autores institucionales directamente
+              por identificador.
             </p>
 
             <div class="form-group">
-              <label for="harvestInstSelect">Institución objetivo:</label>
+              <label for="harvestInstSelect">Entidad registrada (ROR / AF-ID):</label>
               <select id="harvestInstSelect" class="input-select"></select>
             </div>
 
             <div class="form-group">
-              <label for="harvestCustomInst">O escribir afiliación exacta:</label>
-              <input type="text" id="harvestCustomInst" class="input-text" placeholder="Ej. Instituto Nacional de Biodiversidad" />
+              <label for="harvestCustomId">O ingresar identificador directo (Scopus AF-ID o ROR):</label>
+              <input type="text" id="harvestCustomId" class="input-text"
+                placeholder="Ej. 60104441 o 02veev176 o https://ror.org/02veev176" />
             </div>
 
             <div class="form-row-2">
@@ -392,13 +417,15 @@
               </div>
               <div class="form-group">
                 <label for="harvestMaxRecords">Máx. artículos:</label>
-                <input type="number" id="harvestMaxRecords" class="input-text" value="500" min="25" max="2000" step="25" />
+                <input type="number" id="harvestMaxRecords" class="input-text" value="500" min="25" max="2000"
+                  step="25" />
               </div>
             </div>
 
             <div class="form-group">
-              <label for="harvestTargetPattern">Patrón regex para aislar autores propios:</label>
-              <input type="text" id="harvestTargetPattern" class="input-text" value="Instituto Nacional de Biodiversidad|INABIO" />
+              <label for="harvestExtraFilter">Filtro booleano Scopus adicional (opcional):</label>
+              <input type="text" id="harvestExtraFilter" class="input-text"
+                placeholder="Ej. DOCTYPE(ar) OR DOCTYPE(re)" />
             </div>
 
             <label class="checkbox-label" style="margin-bottom: 12px;">
@@ -407,7 +434,7 @@
             </label>
 
             <button id="btnRunHarvestJob" class="btn btn-primary btn-block">
-              📥 Iniciar Descarga de Publicaciones
+              📥 Iniciar Descarga por Identificador
             </button>
           </div>
         </aside>
@@ -426,7 +453,8 @@
           <div class="card">
             <div class="card-header">
               <h2>Catálogo de Artículos Científicos</h2>
-              <input type="text" id="pubTableSearch" class="input-text input-sm" placeholder="Filtrar por título, revista, autor, afiliación o DOI..." style="max-width: 340px;" />
+              <input type="text" id="pubTableSearch" class="input-text input-sm"
+                placeholder="Filtrar por título, revista, autor, AF-ID o DOI..." style="max-width: 340px;" />
             </div>
             <div class="table-scroll">
               <table class="data-table" id="publicationsDataTable">
@@ -459,7 +487,9 @@
               <h2>Configuración de Nube de Palabras</h2>
             </div>
             <p class="helper-text">
-              Genera nubes de palabras vectoriales de alta resolución y gráficos de frecuencia a partir de títulos, revistas científicas, instituciones colaboradoras o autores (evolución de <code>script_wordcloud.R</code>).
+              Genera nubes de palabras vectoriales de alta resolución y gráficos de frecuencia a partir de títulos,
+              revistas científicas, instituciones colaboradoras o autores (evolución de
+              <code>script_wordcloud.R</code>).
             </p>
 
             <div class="form-group">
@@ -517,7 +547,8 @@
 
             <div class="form-group">
               <label for="wcExtraStopwords">Palabras a excluir (separadas por coma):</label>
-              <input type="text" id="wcExtraStopwords" class="input-text" placeholder="Ej. journal, universidad, study..." />
+              <input type="text" id="wcExtraStopwords" class="input-text"
+                placeholder="Ej. journal, universidad, study..." />
             </div>
 
             <button id="btnGenerateWordcloud" class="btn btn-primary btn-block">
@@ -551,7 +582,7 @@
       </div>
     </section>
 
-    <!-- ==================== TAB 4: INSTITUTIONS & API SETTINGS ==================== -->
+    <!-- ==================== TAB 4: ENTITIES (ROR / AF-ID) & API SETTINGS ==================== -->
     <section id="tab-settings" class="tab-panel">
       <div class="workspace-grid">
         <aside class="sidebar-panel">
@@ -560,20 +591,25 @@
               <h2>Credenciales de Scopus API</h2>
             </div>
             <p class="helper-text">
-              La aplicación detecta automáticamente la clave de tu entorno R (<code>worksopace.RData</code> / <code>.Renviron</code>). Puedes verificar la conexión o actualizar tu clave de Elsevier Developer Portal aquí.
+              La aplicación detecta automáticamente la clave de tu entorno R (<code>worksopace.RData</code> /
+              <code>.Renviron</code>). Puedes verificar la conexión o actualizar tu clave de Elsevier Developer Portal
+              aquí.
             </p>
             <div class="form-group">
               <label for="settingsApiKey">Scopus API Key (<code>X-ELS-APIKey</code>):</label>
-              <input type="text" id="settingsApiKey" class="input-text" placeholder="Ingresa tu clave de 32 caracteres hexadecimales" />
+              <input type="text" id="settingsApiKey" class="input-text"
+                placeholder="Ingresa tu clave de 32 caracteres hexadecimales" />
             </div>
             <div class="form-group">
               <label for="settingsInstToken">Institution Token (<code>X-ELS-Insttoken</code> - Opcional):</label>
-              <input type="text" id="settingsInstToken" class="input-text" placeholder="Solo requerido para suscriptores COMPLETE fuera de red" />
+              <input type="text" id="settingsInstToken" class="input-text"
+                placeholder="Solo requerido para suscriptores COMPLETE fuera de red" />
             </div>
             <div class="form-row-2">
               <div class="form-group">
                 <label for="settingsSleepTime">Pausa entre lotes (s):</label>
-                <input type="number" id="settingsSleepTime" class="input-text" value="1.0" step="0.2" min="0.1" max="10" />
+                <input type="number" id="settingsSleepTime" class="input-text" value="1.0" step="0.2" min="0.1"
+                  max="10" />
               </div>
               <div class="form-group">
                 <label for="settingsDefaultView">Vista predeterminada:</label>
@@ -590,14 +626,51 @@
             <div id="apiTestResultBox" class="alert-box hidden"></div>
           </div>
 
-          <div class="card">
+          <div class="card accent-card">
             <div class="card-header">
-              <h2>Añadir Institución al Directorio</h2>
+              <h2 id="instFormTitle">Definir Entidad por Identificador</h2>
+              <button id="btnCancelEditInst" class="btn btn-sm btn-outline hidden" type="button">Cancelar</button>
             </div>
+            <p class="helper-text">
+              Registra o actualiza universidades e institutos mediante su número <strong>Scopus AF-ID</strong> y/o
+              código <strong>ROR</strong> (al menos uno es obligatorio; los metadatos se resuelven automáticamente).
+            </p>
+            <input type="hidden" id="editInstId" value="" />
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="newInstAfid">Scopus AF-ID (Primario):</label>
+                <input type="text" id="newInstAfid" class="input-text" placeholder="Ej. 60104441" />
+              </div>
+              <div class="form-group">
+                <label for="newInstRor">ROR ID (9 caract. o URL):</label>
+                <input type="text" id="newInstRor" class="input-text" placeholder="Ej. 0198j4566" />
+              </div>
+            </div>
+
             <div class="form-group">
-              <label for="newInstName">Nombre oficial en Scopus (<code>AFFIL</code>):</label>
-              <input type="text" id="newInstName" class="input-text" placeholder="Ej. Charles Darwin Foundation" />
+              <button id="btnResolveEntityMeta" type="button" class="btn btn-sm btn-outline btn-block">
+                🔍 Autocompletar metadatos desde ROR / Scopus API
+              </button>
             </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="newInstAcronym">Acrónimo:</label>
+                <input type="text" id="newInstAcronym" class="input-text" placeholder="Ej. IPIAP" />
+              </div>
+              <div class="form-group">
+                <label for="newInstCity">Ciudad:</label>
+                <input type="text" id="newInstCity" class="input-text" placeholder="Ej. Guayaquil" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="newInstName">Etiqueta descriptiva (opcional si se resuelve por ID):</label>
+              <input type="text" id="newInstName" class="input-text"
+                placeholder="Se obtiene automáticamente de ROR / Scopus" />
+            </div>
+
             <div class="form-row-2">
               <div class="form-group">
                 <label for="newInstCategory">Categoría:</label>
@@ -614,35 +687,40 @@
                 </select>
               </div>
             </div>
-            <div class="form-row-2">
-              <div class="form-group">
-                <label for="newInstCity">Ciudad:</label>
-                <input type="text" id="newInstCity" class="input-text" placeholder="Ej. Quito" />
-              </div>
-              <div class="form-group">
-                <label for="newInstAfid">Scopus AF-ID (Opcional):</label>
-                <input type="text" id="newInstAfid" class="input-text" placeholder="Ej. 60006514" />
-              </div>
-            </div>
-            <button id="btnAddInstitution" class="btn btn-primary btn-block">+ Guardar Institución</button>
+
+            <button id="btnAddInstitution" class="btn btn-primary btn-block">+ Guardar Entidad</button>
+            <div id="instFormAlertBox" class="alert-box hidden"></div>
           </div>
         </aside>
 
         <div class="stage-panel">
           <div class="card">
             <div class="card-header">
-              <h2>Directorio Nacional de Universidades e Institutos (<span id="dirTotalCount">0</span>)</h2>
-              <input type="text" id="dirSearchInput" class="input-text input-sm" placeholder="Buscar por nombre, ciudad o tipo..." style="max-width: 280px;" />
+              <div>
+                <h2>Registro Nacional de Entidades por AF-ID &amp; ROR (<span id="dirTotalCount">0</span>)</h2>
+                <span class="helper-text" style="margin-bottom:0;">63 Universidades + 7 Institutos Públicos de
+                  Investigación del Ecuador (incluye IPIAP)</span>
+              </div>
+              <div class="export-buttons" style="align-items:center;">
+                <button id="btnSyncScopusAfids" class="btn btn-sm btn-outline"
+                  title="Descubrir y vincular automáticamente los códigos Scopus AF-ID usando tu API Key">
+                  🔄 Sincronizar AF-IDs con Scopus
+                </button>
+                <input type="text" id="dirSearchInput" class="input-text input-sm"
+                  placeholder="Buscar por AF-ID, ROR, acrónimo o ciudad..." style="width: 260px;" />
+              </div>
             </div>
             <div class="table-scroll">
               <table class="data-table" id="institutionsDirTable">
                 <thead>
                   <tr>
-                    <th>Nombre Oficial de Afiliación (Scopus)</th>
+                    <th>Scopus AF-ID</th>
+                    <th>ROR ID</th>
+                    <th>Acrónimo</th>
+                    <th>Etiqueta Institucional</th>
                     <th>Categoría</th>
                     <th>Sector</th>
                     <th>Ciudad</th>
-                    <th>AF-ID</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -658,5 +736,5 @@
 
   <script src="/app.js"></script>
 </body>
-</html>
 
+</html>

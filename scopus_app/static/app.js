@@ -123,6 +123,93 @@ function escapeXml(str) {
     .replace(/'/g, "&apos;");
 }
 
+function parseAfids(rawAfid) {
+  if (!rawAfid) return [];
+  return String(rawAfid)
+    .split(/[;,\s]+/)
+    .map((s) => s.replace(/^AF-?ID:?/i, "").trim())
+    .filter((s) => /^\d{5,12}$/.test(s));
+}
+
+function formatPrimaryIdText(entity) {
+  if (!entity) return "";
+  const afids = parseAfids(entity.afid);
+  if (afids.length > 0) {
+    return `AF-ID:${afids[0]}`;
+  }
+  if (entity.ror_id) {
+    return `ROR:${entity.ror_id}`;
+  }
+  return entity.entity_uid || "";
+}
+
+function renderAfidBadgesHtml(afidStr, afidStatus = "") {
+  const afids = parseAfids(afidStr);
+  if (afids.length > 0) {
+    return afids
+      .map(
+        (fid) =>
+          `<a class="id-pill id-pill-afid" href="https://www.scopus.com/pages/organization/${encodeURIComponent(fid)}" target="_blank" rel="noopener" title="Perfil Institucional Scopus AF-ID ${escapeXml(fid)}">AF-ID:${escapeXml(fid)}</a>`
+      )
+      .join(" ");
+  }
+  if (afidStatus === "unprofiled") {
+    return `<span class="id-pill id-pill-pending" title="Entidad sin perfil 60xxxxxx curado en Scopus; se consulta mediante desambiguación ROR">Sin perfil 60x</span>`;
+  }
+  return `<span class="id-pill id-pill-pending" title="AF-ID pendiente de descubrir vía API de Scopus">AF-ID pendiente</span>`;
+}
+
+function renderRorBadgeHtml(rorId) {
+  const clean = String(rorId || "").trim();
+  if (clean) {
+    return `<a class="id-pill id-pill-ror" href="https://ror.org/${encodeURIComponent(clean)}" target="_blank" rel="noopener" title="Registro oficial Research Organization Registry (ROR)">ROR:${escapeXml(clean)}</a>`;
+  }
+  return `<span class="id-pill id-pill-pending" title="Entidad nacional sin registro ROR independiente aún">Sin ROR</span>`;
+}
+
+function renderEntityIdBadgesHtml(entity) {
+  if (!entity) return "—";
+  const afids = parseAfids(entity.afid);
+  const parts = [];
+  if (afids.length > 0) {
+    parts.push(renderAfidBadgesHtml(entity.afid, entity.afid_status));
+  }
+  if (entity.ror_id) {
+    parts.push(renderRorBadgeHtml(entity.ror_id));
+  }
+  if (parts.length === 0) {
+    const uid = entity.entity_uid || "—";
+    parts.push(`<span class="id-pill id-pill-pending">${escapeXml(uid)}</span>`);
+  }
+  return `<div class="id-badges">${parts.join("")}</div>`;
+}
+
+function formatChartEntityLabel(item, mode = "name_acr") {
+  if (!item) return "";
+  if (item.category === "City") {
+    return item.institution_name || "";
+  }
+  const acr = String(item.acronym || "").trim();
+  const name = String(item.institution_name || item.name || "").trim();
+  const idText = formatPrimaryIdText(item);
+
+  if (mode === "id_only") {
+    return idText || acr || name;
+  }
+  if (mode === "acr_id") {
+    if (acr && idText) return `${acr} · ${idText}`;
+    return idText || acr || name;
+  }
+  if (mode === "name") {
+    return name || acr || idText;
+  }
+  // Default: "name_acr" -> Acronym — Canonical Label
+  if (acr && name && acr.toLowerCase() !== name.toLowerCase()) {
+    return `${acr} — ${name}`;
+  }
+  return name || acr || idText;
+}
+
 // ==================== INITIALIZATION ====================
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -288,13 +375,17 @@ function renderComparisonKpis(items) {
   const median = sortedVals.length
     ? sortedVals[Math.floor(sortedVals.length / 2)]
     : 0;
+  const labelMode = document.getElementById("chartLabelModeSelect")?.value || "name_acr";
+  const leaderLabel = maxItem
+    ? formatChartEntityLabel(maxItem, labelMode === "name" ? "name" : "acr_id")
+    : "";
 
   document.getElementById("comparisonKpiStrip").innerHTML = `
-    <div class="kpi-chip">Instituciones graficadas: <strong>${items.length}</strong></div>
+    <div class="kpi-chip">Entidades graficadas: <strong>${items.length}</strong></div>
     <div class="kpi-chip">Suma publicaciones: <strong>${total.toLocaleString()}</strong></div>
     <div class="kpi-chip">Promedio: <strong>${mean}</strong></div>
     <div class="kpi-chip">Mediana: <strong>${median}</strong></div>
-    ${maxItem ? `<div class="kpi-chip">Líder: <strong>${escapeXml(maxItem.institution_name)} (${maxItem.total_results})</strong></div>` : ""}
+    ${maxItem ? `<div class="kpi-chip">Líder: <strong>${escapeXml(leaderLabel)} (${maxItem.total_results})</strong></div>` : ""}
   `;
 }
 
@@ -340,6 +431,7 @@ function renderComparisonChartSvg(items) {
   const chartType = document.getElementById("chartTypeSelect").value;
   const themeKey = document.getElementById("chartThemeSelect").value;
   const theme = THEMES[themeKey] || THEMES.pomological;
+  const labelMode = document.getElementById("chartLabelModeSelect")?.value || "name_acr";
   const fontFamily = document.getElementById("chartFontSelect").value;
   const showValues = document.getElementById("chartShowValues").checked;
   const paintedEffect = document.getElementById("chartPaintedEffect").checked && themeKey === "pomological";
@@ -353,14 +445,14 @@ function renderComparisonChartSvg(items) {
 
   if (chartType === "radial") {
     container.innerHTML = buildRadialChartSvg(items, {
-      themeKey, theme, fontFamily, showValues, paintedEffect, title, subtitle
+      themeKey, theme, labelMode, fontFamily, showValues, paintedEffect, title, subtitle
     });
     return;
   }
 
   if (chartType === "vbar") {
     container.innerHTML = buildVerticalBarSvg(items, {
-      themeKey, theme, fontFamily, showValues, paintedEffect, title, subtitle, xLabel, yLabel, refValue
+      themeKey, theme, labelMode, fontFamily, showValues, paintedEffect, title, subtitle, xLabel, yLabel, refValue
     });
     return;
   }
@@ -381,7 +473,7 @@ function renderComparisonChartSvg(items) {
       .sort((a, b) => b.total_results - a.total_results);
     container.innerHTML = buildHorizontalChartSvg(cityItems, {
       chartType: "hbar",
-      themeKey, theme, fontFamily, showValues, paintedEffect, aspect: "golden",
+      themeKey, theme, labelMode: "name", fontFamily, showValues, paintedEffect, aspect: "golden",
       title: `${title} — Por Ciudad`,
       subtitle,
       xLabel,
@@ -392,7 +484,7 @@ function renderComparisonChartSvg(items) {
   }
 
   container.innerHTML = buildHorizontalChartSvg(items, {
-    chartType, themeKey, theme, fontFamily, showValues, paintedEffect, aspect,
+    chartType, themeKey, theme, labelMode, fontFamily, showValues, paintedEffect, aspect,
     title, subtitle, xLabel, yLabel, refValue
   });
 }
@@ -417,18 +509,19 @@ function buildSvgFilterDefs(paintedEffect, outerBg) {
 
 function buildHorizontalChartSvg(items, opts) {
   const {
-    chartType, themeKey, theme, fontFamily, showValues, paintedEffect, aspect,
+    chartType, themeKey, theme, labelMode = "name_acr", fontFamily, showValues, paintedEffect, aspect,
     title, subtitle, xLabel, yLabel, refValue
   } = opts;
 
   const n = items.length;
+  const itemLabels = items.map((i) => formatChartEntityLabel(i, labelMode));
   let width = 1080;
   let rowHeight = n > 35 ? 19 : n > 18 ? 26 : 48;
   let minHeight = aspect === "golden" ? 668 : aspect === "wide" ? 608 : aspect === "square" ? 960 : 720;
   const marginTop = subtitle ? 76 : 58;
   const marginBottom = 72;
-  const maxNameLen = Math.max(...items.map((i) => i.institution_name.length), 20);
-  const marginLeft = Math.min(430, Math.max(250, maxNameLen * 6.4 + 45));
+  const maxNameLen = Math.max(...itemLabels.map((lbl) => lbl.length), 20);
+  const marginLeft = Math.min(460, Math.max(220, maxNameLen * 6.3 + 42));
   const marginRight = 70;
 
   const height = Math.max(minHeight, marginTop + marginBottom + n * rowHeight + 20);
@@ -507,11 +600,12 @@ function buildHorizontalChartSvg(items, opts) {
 
   svg += `</g>`;
 
-  // Institution Y-axis Labels
-  items.forEach((item, idx) => {
+  // Entity Y-axis Labels
+  items.forEach((_item, idx) => {
     const cy = marginTop + stepY * (idx + 0.5);
+    const yText = itemLabels[idx].length > 66 ? itemLabels[idx].slice(0, 64) + "…" : itemLabels[idx];
     svg += `<line x1="${marginLeft - 4}" y1="${cy.toFixed(1)}" x2="${marginLeft}" y2="${cy.toFixed(1)}" stroke="${theme.mutedColor}" stroke-width="1"/>`;
-    svg += `<text x="${marginLeft - 8}" y="${(cy + labelFontSize * 0.34).toFixed(1)}" text-anchor="end" fill="${theme.mutedColor}" font-size="${labelFontSize}">${escapeXml(item.institution_name)}</text>`;
+    svg += `<text x="${marginLeft - 8}" y="${(cy + labelFontSize * 0.34).toFixed(1)}" text-anchor="end" fill="${theme.mutedColor}" font-size="${labelFontSize}">${escapeXml(yText)}</text>`;
   });
 
   // Titles & Axis Labels
@@ -544,7 +638,7 @@ function buildHorizontalChartSvg(items, opts) {
 
 function buildVerticalBarSvg(items, opts) {
   const {
-    themeKey, theme, fontFamily, showValues, paintedEffect,
+    themeKey, theme, labelMode = "name_acr", fontFamily, showValues, paintedEffect,
     title, subtitle, xLabel, yLabel, refValue
   } = opts;
 
@@ -592,10 +686,11 @@ function buildVerticalBarSvg(items, opts) {
       svg += `<text x="${cx.toFixed(1)}" y="${(yTop - 7).toFixed(1)}" text-anchor="middle" fill="${theme.textColor}" font-size="11.5" font-weight="600">${val.toLocaleString()}</text>`;
     }
 
-    // Rotated 45-degree wrapped label (matching plot.R)
-    const shortName = item.institution_name.length > 34
-      ? item.institution_name.slice(0, 32) + "…"
-      : item.institution_name;
+    // Rotated 40-degree wrapped label
+    const rawLabel = formatChartEntityLabel(item, labelMode);
+    const shortName = rawLabel.length > 36
+      ? rawLabel.slice(0, 34) + "…"
+      : rawLabel;
     svg += `<text transform="translate(${cx.toFixed(1)}, ${marginTop + plotH + 16}) rotate(-40)" text-anchor="end" fill="${theme.mutedColor}" font-size="11.5">${escapeXml(shortName)}</text>`;
   });
 
@@ -610,7 +705,7 @@ function buildVerticalBarSvg(items, opts) {
 }
 
 function buildRadialChartSvg(items, opts) {
-  const { themeKey, theme, fontFamily, showValues, title, subtitle } = opts;
+  const { themeKey, theme, labelMode = "name_acr", fontFamily, showValues, title, subtitle } = opts;
   const displayItems = items.slice(0, 30);
   const n = displayItems.length;
   const width = 920;
@@ -657,7 +752,8 @@ function buildRadialChartSvg(items, opts) {
     const flip = deg > 90 && deg < 270;
     const rot = flip ? deg + 180 : deg;
     const anchor = flip ? "end" : "start";
-    const shortName = item.institution_name.replace(/^Universidad /i, "U. ").slice(0, 26);
+    const rawLabel = formatChartEntityLabel(item, labelMode);
+    const shortName = rawLabel.replace(/Universidad /gi, "U. ").slice(0, 28);
     const labelText = showValues ? `${shortName} (${val})` : shortName;
 
     svg += `<text transform="translate(${lx.toFixed(1)}, ${ly.toFixed(1)}) rotate(${rot.toFixed(1)})" text-anchor="${anchor}" alignment-baseline="middle" fill="${theme.textColor}" font-size="10.5" font-weight="500">${escapeXml(labelText)}</text>`;
@@ -665,7 +761,7 @@ function buildRadialChartSvg(items, opts) {
 
   svg += `<circle cx="${cx}" cy="${cy}" r="${innerR - 4}" fill="${theme.panelBg}" stroke="${theme.gridColor}"/>`;
   svg += `<text x="${cx}" y="${cy - 6}" text-anchor="middle" fill="${theme.textColor}" font-size="14" font-weight="700">SCOPUS</text>`;
-  svg += `<text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="${theme.mutedColor}" font-size="11">Top ${n} IES</text>`;
+  svg += `<text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="${theme.mutedColor}" font-size="11">Top ${n} Entidades</text>`;
 
   svg += `<text x="${cx}" y="38" text-anchor="middle" fill="${theme.textColor}" font-size="20" font-weight="700">${escapeXml(title)}</text>`;
   if (subtitle) {
@@ -683,7 +779,11 @@ function renderComparisonTable(items) {
   const filtered = search
     ? items.filter(
         (i) =>
-          i.institution_name.toLowerCase().includes(search) ||
+          (i.afid || "").toLowerCase().includes(search) ||
+          (i.ror_id || "").toLowerCase().includes(search) ||
+          (i.entity_uid || "").toLowerCase().includes(search) ||
+          (i.acronym || "").toLowerCase().includes(search) ||
+          (i.institution_name || "").toLowerCase().includes(search) ||
           (i.city || "").toLowerCase().includes(search)
       )
     : items;
@@ -697,9 +797,14 @@ function renderComparisonTable(items) {
           : item.inst_type === "Public"
           ? "badge-public"
           : "badge-private";
+      const acrHtml = item.acronym
+        ? `<span class="acr-badge">${escapeXml(item.acronym)}</span>`
+        : "—";
       return `
         <tr>
           <td>${idx + 1}</td>
+          <td>${renderEntityIdBadgesHtml(item)}</td>
+          <td>${acrHtml}</td>
           <td><strong>${escapeXml(item.institution_name)}</strong></td>
           <td>${escapeXml(item.category)}</td>
           <td><span class="badge ${badgeClass}">${escapeXml(item.inst_type)}</span></td>
@@ -720,10 +825,11 @@ function bindComparisonControls() {
 
   // Live reactive graph controls
   [
-    "chartTypeSelect", "chartThemeSelect", "chartTitleInput", "chartSubtitleInput",
-    "chartXLabelInput", "chartYLabelInput", "chartTopN", "chartSectorFilter",
-    "chartCityFilter", "chartRefLineMode", "chartRefLineVal", "chartAspectSelect",
-    "chartFontSelect", "chartShowValues", "chartPaintedEffect", "chartHideZero"
+    "chartTypeSelect", "chartThemeSelect", "chartLabelModeSelect",
+    "chartTitleInput", "chartSubtitleInput", "chartXLabelInput", "chartYLabelInput",
+    "chartTopN", "chartSectorFilter", "chartCityFilter", "chartRefLineMode",
+    "chartRefLineVal", "chartAspectSelect", "chartFontSelect", "chartShowValues",
+    "chartPaintedEffect", "chartHideZero"
   ].forEach((id) => {
     const el = document.getElementById(id);
     if (el) {
@@ -783,50 +889,81 @@ function bindComparisonControls() {
 }
 
 function populateInstitutionChecklists() {
-  // Default preset: 6 Public Research Institutes
+  const instCount = STATE.institutions.filter((i) => i.category === "Research Institute").length;
+  const univCount = STATE.institutions.filter((i) => i.category === "University").length;
+  const instBtn = document.getElementById("presetInstitutesBtn");
+  const univBtn = document.getElementById("presetAllUnivBtn");
+  if (instBtn) instBtn.textContent = `Institutos Públicos (${instCount})`;
+  if (univBtn) univBtn.textContent = `${univCount} Universidades`;
+
+  const validUids = new Set(STATE.institutions.map((i) => i.entity_uid));
+  const keptSelection = Array.from(STATE.selectedInstSet).filter((uid) => validUids.has(uid));
   STATE.selectedInstSet.clear();
-  STATE.institutions
-    .filter((i) => i.category === "Research Institute")
-    .forEach((i) => STATE.selectedInstSet.add(i.name));
+  if (keptSelection.length > 0) {
+    keptSelection.forEach((uid) => STATE.selectedInstSet.add(uid));
+  } else {
+    // Default preset: All Public Research Institutes (including IPIAP) by canonical UID
+    STATE.institutions
+      .filter((i) => i.category === "Research Institute")
+      .forEach((i) => STATE.selectedInstSet.add(i.entity_uid));
+  }
 
   renderInstitutionChecklistItems();
   updateQueryPreview();
 
-  // Also populate Harvester institution dropdown
+  // Populate Harvester entity dropdown keyed strictly by canonical entity_uid
   const harvSel = document.getElementById("harvestInstSelect");
+  const prevHarvVal = harvSel.value;
   harvSel.innerHTML = STATE.institutions
-    .map((i) => `<option value="${escapeXml(i.name)}">${escapeXml(i.name)} (${escapeXml(i.category)})</option>`)
+    .map((i) => {
+      const idTag = formatPrimaryIdText(i);
+      const acr = i.acronym ? `[${i.acronym}] ` : "";
+      return `<option value="${escapeXml(i.entity_uid)}">${escapeXml(acr)}${escapeXml(idTag)} — ${escapeXml(i.name)}</option>`;
+    })
     .join("");
-  harvSel.value = "Instituto Nacional de Biodiversidad";
+
+  if (prevHarvVal && validUids.has(prevHarvVal)) {
+    harvSel.value = prevHarvVal;
+  } else {
+    const defaultHarv =
+      STATE.institutions.find((i) => i.ror_id === "02veev176") || STATE.institutions[0];
+    if (defaultHarv) {
+      harvSel.value = defaultHarv.entity_uid;
+    }
+  }
 }
+
+const AGRI6_CANONICAL_RORS = new Set([
+  "02qztda51", // PUCE
+  "05j136930", // ESPE
+  "05xedqd83", // IKIAM
+  "02veev176", // INABIO
+  "0198j4566", // UDLA
+  "01r2c3v86", // USFQ
+]);
 
 function applyInstitutionPreset(preset) {
   STATE.selectedInstSet.clear();
   if (preset === "institutes") {
     STATE.institutions
       .filter((i) => i.category === "Research Institute")
-      .forEach((i) => STATE.selectedInstSet.add(i.name));
+      .forEach((i) => STATE.selectedInstSet.add(i.entity_uid));
   } else if (preset === "agri6") {
-    [
-      "Pontificia Universidad Católica del Ecuador",
-      "Universidad de las Fuerzas Armadas",
-      "Universidad Regional Amazónica Ikiam",
-      "Instituto Nacional de Biodiversidad",
-      "Universidad de Las Américas",
-      "Universidad San Francisco de Quito"
-    ].forEach((n) => STATE.selectedInstSet.add(n));
+    STATE.institutions
+      .filter((i) => AGRI6_CANONICAL_RORS.has(i.ror_id))
+      .forEach((i) => STATE.selectedInstSet.add(i.entity_uid));
   } else if (preset === "public_univ") {
     STATE.institutions
       .filter((i) => i.category === "University" && i.inst_type === "Public")
-      .forEach((i) => STATE.selectedInstSet.add(i.name));
+      .forEach((i) => STATE.selectedInstSet.add(i.entity_uid));
   } else if (preset === "private_univ") {
     STATE.institutions
       .filter((i) => i.category === "University" && i.inst_type === "Private")
-      .forEach((i) => STATE.selectedInstSet.add(i.name));
+      .forEach((i) => STATE.selectedInstSet.add(i.entity_uid));
   } else if (preset === "all_univ") {
     STATE.institutions
       .filter((i) => i.category === "University")
-      .forEach((i) => STATE.selectedInstSet.add(i.name));
+      .forEach((i) => STATE.selectedInstSet.add(i.entity_uid));
   }
   renderInstitutionChecklistItems();
   updateQueryPreview();
@@ -840,21 +977,32 @@ function renderInstitutionChecklistItems() {
   const list = filter
     ? STATE.institutions.filter(
         (i) =>
-          i.name.toLowerCase().includes(filter) ||
+          (i.afid || "").toLowerCase().includes(filter) ||
+          (i.ror_id || "").toLowerCase().includes(filter) ||
+          (i.entity_uid || "").toLowerCase().includes(filter) ||
+          (i.acronym || "").toLowerCase().includes(filter) ||
+          (i.name || "").toLowerCase().includes(filter) ||
           (i.city || "").toLowerCase().includes(filter)
       )
     : STATE.institutions;
 
   box.innerHTML = list
     .map((inst) => {
-      const checked = STATE.selectedInstSet.has(inst.name) ? "checked" : "";
+      const checked = STATE.selectedInstSet.has(inst.entity_uid) ? "checked" : "";
+      const idText = formatPrimaryIdText(inst);
+      const pillClass = parseAfids(inst.afid).length > 0
+        ? "id-pill-afid"
+        : inst.ror_id
+        ? "id-pill-ror"
+        : "id-pill-pending";
       return `
         <div class="checklist-item">
-          <label>
-            <input type="checkbox" data-inst-name="${escapeXml(inst.name)}" ${checked} />
-            <span>${escapeXml(inst.name)}</span>
+          <label title="${escapeXml(inst.name)} (${escapeXml(inst.city || inst.category)})">
+            <input type="checkbox" data-entity-uid="${escapeXml(inst.entity_uid)}" ${checked} />
+            ${inst.acronym ? `<span class="acr-badge">${escapeXml(inst.acronym)}</span>` : ""}
+            <span class="checklist-item-text">${escapeXml(inst.name)}</span>
           </label>
-          <span class="city-tag">${escapeXml(inst.city || inst.category)}</span>
+          <span class="id-pill ${pillClass}">${escapeXml(idText)}</span>
         </div>
       `;
     })
@@ -862,40 +1010,52 @@ function renderInstitutionChecklistItems() {
 
   box.querySelectorAll("input[type=checkbox]").forEach((cb) => {
     cb.addEventListener("change", () => {
-      const name = cb.dataset.instName;
-      if (cb.checked) STATE.selectedInstSet.add(name);
-      else STATE.selectedInstSet.delete(name);
+      const uid = cb.dataset.entityUid;
+      if (cb.checked) STATE.selectedInstSet.add(uid);
+      else STATE.selectedInstSet.delete(uid);
       document.getElementById("selectedInstCount").textContent = String(STATE.selectedInstSet.size);
       updateQueryPreview();
     });
   });
 }
 
-function updateQueryPreview() {
-  const sampleInst = Array.from(STATE.selectedInstSet)[0] || "Pontificia Universidad Católica del Ecuador";
+let _previewReqSeq = 0;
+
+async function updateQueryPreview() {
+  const reqId = ++_previewReqSeq;
+  const sampleUid =
+    Array.from(STATE.selectedInstSet)[0] ||
+    (STATE.institutions[0] && STATE.institutions[0].entity_uid) ||
+    "60104441";
   const year = document.getElementById("compQueryYear").value || "2025";
   const subj = document.getElementById("compQuerySubj").value || "ALL";
   const oa = document.getElementById("compQueryOA").checked;
 
-  const normSample = sampleInst.toLowerCase();
-  let q =
-    normSample === "universidad nacional de educación"
-      ? `(AFFIL("Universidad Nacional de Educación") AND AFFIL("Azogues"))`
-      : normSample === "universidad de las américas"
-      ? `AF-ID(60104441)`
-      : normSample.includes("yachay")
-      ? `(AF-ID(60105012) OR (AFFIL("Yachay") AND AFFILCOUNTRY(Ecuador)))`
-      : `AFFIL("${sampleInst}") AND AFFILCOUNTRY(Ecuador)`;
-  if (subj !== "ALL") q += ` AND SUBJAREA(${subj})`;
-  q += ` AND PUBYEAR = ${year}`;
-  if (oa) q += ` AND ACCESSTYPE(OA)`;
-  document.getElementById("compQueryPreview").textContent = q;
+  try {
+    const res = await fetch("/api/preview-query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entity_ref: sampleUid,
+        year,
+        subj_area: subj,
+        open_access_only: oa,
+      }),
+    });
+    if (!res.ok || reqId !== _previewReqSeq) return;
+    const data = await res.json();
+    if (data.query) {
+      document.getElementById("compQueryPreview").textContent = data.query;
+    }
+  } catch (_err) {
+    // Fallback preview if offline
+  }
 }
 
 async function launchComparisonJob() {
-  const institutions = Array.from(STATE.selectedInstSet);
-  if (institutions.length === 0) {
-    alert("Selecciona al menos una institución para consultar en Scopus.");
+  const entity_ids = Array.from(STATE.selectedInstSet);
+  if (entity_ids.length === 0) {
+    alert("Selecciona al menos una entidad (AF-ID / ROR) para consultar en Scopus.");
     return;
   }
   const year = document.getElementById("compQueryYear").value || "2025";
@@ -915,7 +1075,7 @@ async function launchComparisonJob() {
       subj_area,
       open_access_only,
       sleep_time,
-      institutions,
+      entity_ids,
     }),
   });
   const data = await res.json();
@@ -954,10 +1114,13 @@ async function loadHarvestDataset(dsId) {
   document.getElementById("btnExportDatasetCsv").href = `/api/export/dataset/${dataset.id}?format=csv`;
   document.getElementById("btnExportDatasetXlsx").href = `/api/export/dataset/${dataset.id}?format=xlsx`;
 
+  const acrTag = dataset.acronym
+    ? `<span class="acr-badge">${escapeXml(dataset.acronym)}</span> `
+    : "";
   document.getElementById("harvestDatasetMeta").innerHTML = `
-    <div><strong>Institución:</strong> ${escapeXml(dataset.institution_name)}</div>
-    <div><strong>Año:</strong> ${escapeXml(dataset.year)} &nbsp;|&nbsp; <strong>Vista:</strong> ${escapeXml(dataset.view_mode)}</div>
-    <div><strong>Artículos únicos:</strong> ${publications.length}</div>
+    <div style="margin-bottom:4px;"><strong>Identificadores:</strong> ${renderEntityIdBadgesHtml(dataset)}</div>
+    <div><strong>Entidad:</strong> ${acrTag}${escapeXml(dataset.institution_name)}</div>
+    <div><strong>Año:</strong> ${escapeXml(dataset.year)} &nbsp;|&nbsp; <strong>Vista:</strong> ${escapeXml(dataset.view_mode)} &nbsp;|&nbsp; <strong>Artículos únicos:</strong> ${publications.length}</div>
     <div><strong>Consulta:</strong> <code>${escapeXml(dataset.query_used)}</code></div>
   `;
 
@@ -1056,33 +1219,27 @@ function bindHarvestControls() {
     }
   });
 
-  document.getElementById("harvestInstSelect").addEventListener("change", (e) => {
-    const val = e.target.value;
-    document.getElementById("harvestTargetPattern").value = val.includes("Biodiversidad")
-      ? "Instituto Nacional de Biodiversidad|INABIO"
-      : val;
-  });
-
   document.getElementById("btnRunHarvestJob").addEventListener("click", async () => {
-    const customInst = document.getElementById("harvestCustomInst").value.trim();
-    const institution_name = customInst || document.getElementById("harvestInstSelect").value;
+    const custom_identifier = document.getElementById("harvestCustomId").value.trim();
+    const entity_ref = document.getElementById("harvestInstSelect").value;
     const year = document.getElementById("harvestYear").value.trim() || "2025";
     const subj_area = document.getElementById("harvestSubj").value || "ALL";
     const view_mode = document.getElementById("harvestViewMode").value || "STANDARD";
     const max_records = parseInt(document.getElementById("harvestMaxRecords").value || "500", 10);
-    const target_pattern = document.getElementById("harvestTargetPattern").value.trim();
+    const extra_filter = document.getElementById("harvestExtraFilter").value.trim();
     const open_access_only = document.getElementById("harvestOAOnly").checked;
 
     const res = await fetch("/api/jobs/harvest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        institution_name,
+        custom_identifier,
+        entity_ref,
         year,
         subj_area,
         view_mode,
         max_records,
-        target_pattern,
+        extra_filter,
         open_access_only,
       }),
     });
@@ -1317,7 +1474,11 @@ function renderInstitutionsDirectoryTable() {
   const list = q
     ? STATE.institutions.filter(
         (i) =>
-          i.name.toLowerCase().includes(q) ||
+          (i.afid || "").toLowerCase().includes(q) ||
+          (i.ror_id || "").toLowerCase().includes(q) ||
+          (i.entity_uid || "").toLowerCase().includes(q) ||
+          (i.acronym || "").toLowerCase().includes(q) ||
+          (i.name || "").toLowerCase().includes(q) ||
           (i.city || "").toLowerCase().includes(q) ||
           (i.category || "").toLowerCase().includes(q)
       )
@@ -1333,28 +1494,82 @@ function renderInstitutionsDirectoryTable() {
           : inst.inst_type === "Public"
           ? "badge-public"
           : "badge-private";
+      const acrHtml = inst.acronym
+        ? `<span class="acr-badge">${escapeXml(inst.acronym)}</span>`
+        : "—";
       return `
         <tr>
+          <td>${renderAfidBadgesHtml(inst.afid, inst.afid_status)}</td>
+          <td>${renderRorBadgeHtml(inst.ror_id)}</td>
+          <td>${acrHtml}</td>
           <td><strong>${escapeXml(inst.name)}</strong></td>
           <td>${escapeXml(inst.category)}</td>
           <td><span class="badge ${badgeClass}">${escapeXml(inst.inst_type)}</span></td>
           <td>${escapeXml(inst.city || "—")}</td>
-          <td><code>${escapeXml(inst.afid || "—")}</code></td>
           <td>
-            <button class="btn btn-sm btn-ghost-danger" data-del-inst="${inst.id}">Eliminar</button>
+            <div class="action-btns">
+              <button class="btn btn-sm btn-outline" data-edit-inst="${inst.id}">Editar</button>
+              <button class="btn btn-sm btn-ghost-danger" data-del-inst="${inst.id}">Eliminar</button>
+            </div>
           </td>
         </tr>
       `;
     })
     .join("");
 
+  tbody.querySelectorAll("[data-edit-inst]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = parseInt(btn.dataset.editInst, 10);
+      const inst = STATE.institutions.find((i) => i.id === id);
+      if (inst) startEditingInstitution(inst);
+    });
+  });
+
   tbody.querySelectorAll("[data-del-inst]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const id = btn.dataset.delInst;
+      const id = parseInt(btn.dataset.delInst, 10);
+      const inst = STATE.institutions.find((i) => i.id === id);
+      const label = inst ? `${inst.acronym || ""} (${formatPrimaryIdText(inst)})`.trim() : `#${id}`;
+      if (!confirm(`¿Eliminar la entidad ${label} del registro?`)) return;
       await fetch(`/api/institutions/${id}`, { method: "DELETE" });
       await loadBootstrapData();
     });
   });
+}
+
+function startEditingInstitution(inst) {
+  document.getElementById("editInstId").value = String(inst.id);
+  document.getElementById("newInstAfid").value = inst.afid || "";
+  document.getElementById("newInstRor").value = inst.ror_id || "";
+  document.getElementById("newInstAcronym").value = inst.acronym || "";
+  document.getElementById("newInstCity").value = inst.city || "";
+  document.getElementById("newInstName").value = inst.name || "";
+  document.getElementById("newInstCategory").value = inst.category || "University";
+  document.getElementById("newInstType").value = inst.inst_type || "Public";
+
+  document.getElementById("instFormTitle").textContent = `Editar Entidad (${inst.acronym || formatPrimaryIdText(inst)})`;
+  document.getElementById("btnAddInstitution").textContent = "💾 Actualizar Entidad";
+  document.getElementById("btnCancelEditInst").classList.remove("hidden");
+  document.getElementById("instFormAlertBox").classList.add("hidden");
+  document.getElementById("newInstAfid").focus();
+}
+
+function resetInstitutionForm(clearAlert = true) {
+  document.getElementById("editInstId").value = "";
+  document.getElementById("newInstAfid").value = "";
+  document.getElementById("newInstRor").value = "";
+  document.getElementById("newInstAcronym").value = "";
+  document.getElementById("newInstCity").value = "";
+  document.getElementById("newInstName").value = "";
+  document.getElementById("newInstCategory").value = "University";
+  document.getElementById("newInstType").value = "Public";
+
+  document.getElementById("instFormTitle").textContent = "Definir Entidad por Identificador";
+  document.getElementById("btnAddInstitution").textContent = "+ Guardar Entidad";
+  document.getElementById("btnCancelEditInst").classList.add("hidden");
+  if (clearAlert) {
+    document.getElementById("instFormAlertBox").classList.add("hidden");
+  }
 }
 
 function bindSettingsControls() {
@@ -1396,26 +1611,114 @@ function bindSettingsControls() {
     box.textContent = data.message;
   });
 
-  document.getElementById("btnAddInstitution").addEventListener("click", async () => {
-    const name = document.getElementById("newInstName").value.trim();
-    if (!name) {
-      alert("Ingresa el nombre oficial de la institución.");
+  document.getElementById("btnCancelEditInst").addEventListener("click", () => {
+    resetInstitutionForm(true);
+  });
+
+  document.getElementById("btnResolveEntityMeta").addEventListener("click", async () => {
+    const afid = document.getElementById("newInstAfid").value.trim();
+    const ror_id = document.getElementById("newInstRor").value.trim();
+    const alertBox = document.getElementById("instFormAlertBox");
+
+    if (!afid && !ror_id) {
+      alertBox.className = "alert-box error";
+      alertBox.textContent = "Ingresa primero un código Scopus AF-ID o ROR ID para consultar sus metadatos.";
+      alertBox.classList.remove("hidden");
       return;
     }
+
+    alertBox.className = "alert-box";
+    alertBox.textContent = "Resolviendo metadatos oficiales desde ROR / Scopus API...";
+    alertBox.classList.remove("hidden");
+
+    try {
+      const res = await fetch("/api/institutions/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ afid, ror_id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        alertBox.className = "alert-box error";
+        alertBox.textContent = data.error || "No fue posible resolver el identificador.";
+        return;
+      }
+      const ent = data.entity || {};
+      if (ent.afid) document.getElementById("newInstAfid").value = ent.afid;
+      if (ent.ror_id) document.getElementById("newInstRor").value = ent.ror_id;
+      if (ent.acronym) document.getElementById("newInstAcronym").value = ent.acronym;
+      if (ent.city) document.getElementById("newInstCity").value = ent.city;
+      if (ent.name) document.getElementById("newInstName").value = ent.name;
+      if (ent.category) document.getElementById("newInstCategory").value = ent.category;
+      if (ent.inst_type) document.getElementById("newInstType").value = ent.inst_type;
+
+      alertBox.className = "alert-box success";
+      alertBox.textContent = `Metadatos resueltos: ${ent.acronym ? "[" + ent.acronym + "] " : ""}${ent.name || ent.afid || ent.ror_id}`;
+    } catch (err) {
+      alertBox.className = "alert-box error";
+      alertBox.textContent = `Error al resolver metadatos: ${err}`;
+    }
+  });
+
+  document.getElementById("btnAddInstitution").addEventListener("click", async () => {
+    const editId = document.getElementById("editInstId").value.trim();
+    const afid = document.getElementById("newInstAfid").value.trim();
+    const ror_id = document.getElementById("newInstRor").value.trim();
+    const acronym = document.getElementById("newInstAcronym").value.trim();
+    const city = document.getElementById("newInstCity").value.trim();
+    const name = document.getElementById("newInstName").value.trim();
     const category = document.getElementById("newInstCategory").value;
     const inst_type = document.getElementById("newInstType").value;
-    const city = document.getElementById("newInstCity").value.trim();
-    const afid = document.getElementById("newInstAfid").value.trim();
+    const alertBox = document.getElementById("instFormAlertBox");
 
-    await fetch("/api/institutions", {
+    if (!afid && !ror_id && !editId) {
+      alertBox.className = "alert-box error";
+      alertBox.textContent = "Debes definir la entidad por su Scopus AF-ID (ej. 60104441) y/o su ROR ID (ej. 0198j4566).";
+      alertBox.classList.remove("hidden");
+      return;
+    }
+
+    const res = await fetch("/api/institutions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, category, inst_type, city, afid }),
+      body: JSON.stringify({
+        id: editId ? parseInt(editId, 10) : null,
+        afid,
+        ror_id,
+        acronym,
+        name,
+        category,
+        inst_type,
+        city,
+      }),
     });
-    document.getElementById("newInstName").value = "";
-    document.getElementById("newInstCity").value = "";
-    document.getElementById("newInstAfid").value = "";
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      alertBox.className = "alert-box error";
+      alertBox.textContent = data.error || "Error al guardar la entidad.";
+      alertBox.classList.remove("hidden");
+      return;
+    }
+
+    resetInstitutionForm(false);
+    alertBox.className = "alert-box success";
+    alertBox.textContent = editId
+      ? "Entidad actualizada correctamente."
+      : "Entidad registrada correctamente por identificador.";
+    alertBox.classList.remove("hidden");
     await loadBootstrapData();
+  });
+
+  document.getElementById("btnSyncScopusAfids").addEventListener("click", async () => {
+    const res = await fetch("/api/jobs/sync-afids", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force: false }),
+    });
+    const data = await res.json();
+    if (data.job_id) {
+      startJobMonitoring(data.job_id);
+    }
   });
 }
 

@@ -13,10 +13,10 @@ Built with a **zero-dependency Python 3.10+ standard library backend** and an in
 
 ## ✨ Key Features
 
-- **Automated Scopus Query Engine**:
-  - Run multi-institution comparative queries with pagination, retry handling, and rate-limiting.
-  - Harvest complete publication catalogs (titles, journals, publication dates, ISSN/ISBN, authors, co-affiliations, and DOIs).
-  - Built-in institutional disambiguation using canonical **ROR** and **Scopus Affiliation IDs (AF-ID)** to eliminate international homonym skew (e.g., UNAE `01yg1g961`, UDLA `0198j4566` / `60104441`).
+- **Identifier-First Entity Resolution (`Scopus AF-ID` & `ROR`)**:
+  - Entities (universities and research institutes) are defined and referenced canonically by their **Scopus Affiliation Identifier (`AF-ID`)** and **Research Organization Registry (`ROR`)** ID rather than fragile institution name strings.
+  - Pure `AF-ID(...)` Scopus queries whenever an entity has a curated Scopus institutional profile (`60xxxxxx`), with automatic live `AF-ID` discovery & caching via Elsevier's API and ROR-backed disambiguated fallback for unprofiled entities.
+  - Harvest complete publication catalogs (titles, journals, publication dates, ISSN/ISBN, authors, co-affiliations, and DOIs), isolating institutional authors directly by `AF-ID`.
 
 - **Publication-Ready Aesthetic Graphs**:
   - **Graph Types**: Horizontal Lollipop (`geom_segment` + `geom_point`), Ranked Bars, Vertical Columns, Circular Radial Charts, and City/Sector aggregations.
@@ -33,7 +33,7 @@ Built with a **zero-dependency Python 3.10+ standard library backend** and an in
 
 - **Zero-Dependency Architecture**:
   - Runs natively on Python 3.10+ without requiring external package installations (`pip`).
-  - Pre-seeded with institutional profiles for 63 Ecuadorian universities and public research institutes (e.g., INABIO, INIAP, INSPI).
+  - Pre-seeded with canonical `AF-ID` / `ROR` profiles for **63 Ecuadorian universities** and **7 public research institutes** (INABIO, INIAP, INSPI, IIGE, IPIAP, IG-EPN, INOCAR).
 
 ---
 

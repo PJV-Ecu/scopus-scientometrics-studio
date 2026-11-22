@@ -16,7 +16,15 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
 
-from database import get_connection, init_db
+from database import (
+    find_institution,
+    format_afids,
+    get_connection,
+    init_db,
+    normalize_afids,
+    normalize_ror_id,
+    upsert_institution,
+)
 from scopus_client import (
     JOBS,
     JOBS_LOCK,
@@ -25,7 +33,9 @@ from scopus_client import (
     generate_csv_bytes,
     generate_xlsx_bytes,
     get_settings,
+    resolve_entity_metadata,
     scopus_api_request,
+    start_afid_sync_job,
     start_comparison_job,
     start_harvest_job,
 )
@@ -40,7 +50,7 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
         """Check HTTP Basic Auth if APP_PASSWORD environment variable is set."""
         app_pwd = os.environ.get("APP_PASSWORD", "").strip()
         if not app_pwd:
-            return True  # No password configured, open mode
+            return True
 
         app_user = os.environ.get("APP_USERNAME", "admin").strip()
         auth_header = self.headers.get("Authorization", "")
@@ -71,7 +81,6 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, fmt, *args):
-        # Clean concise logging
         sys.stderr.write(f"[ScopusStudio] {self.address_string()} - {fmt % args}\n")
 
     def _send_json(self, data: dict, status: int = 200) -> None:
@@ -107,7 +116,6 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
         path = parsed.path
         query_params = urllib.parse.parse_qs(parsed.query)
 
-        # Cloud health check endpoint (bypasses password so host monitoring sees 200 OK)
         if path in ("/health", "/api/health"):
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
@@ -151,7 +159,6 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
             if ds_id_str.isdigit():
                 return self._handle_export_dataset(int(ds_id_str), fmt)
 
-        # Serve static frontend files
         return self._serve_static(path)
 
     def do_POST(self):
@@ -169,18 +176,17 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
             return self._handle_test_key(body)
 
         if path == "/api/preview-query":
-            q = build_scopus_query(
-                institution_name=body.get("institution_name", "Pontificia Universidad Católica del Ecuador"),
-                year=body.get("year", "2025"),
-                subj_area=body.get("subj_area", "ALL"),
-                open_access_only=bool(body.get("open_access_only", False)),
-                afid=body.get("afid", ""),
-                extra_filter=body.get("extra_filter", ""),
-            )
-            return self._send_json({"query": q})
+            return self._handle_preview_query(body)
+
+        if path == "/api/institutions/resolve":
+            return self._handle_resolve_institution(body)
 
         if path == "/api/institutions":
             return self._handle_add_institution(body)
+
+        if path == "/api/jobs/sync-afids":
+            job_id = start_afid_sync_job(body)
+            return self._send_json({"job_id": job_id})
 
         if path == "/api/jobs/comparison":
             job_id = start_comparison_job(body)
@@ -258,7 +264,13 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
         institutions = [
             dict(r)
             for r in conn.execute(
-                "SELECT id, name, category, inst_type, city, afid, aliases FROM institutions ORDER BY category DESC, name ASC"
+                """
+                SELECT id, entity_uid, ror_id, afid, afid_status, acronym, name,
+                       category, inst_type, city, country, aliases
+                FROM institutions
+                WHERE active = 1
+                ORDER BY category DESC, name ASC
+                """
             ).fetchall()
         ]
         comparison_runs = [
@@ -294,6 +306,36 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
                 "institutions": institutions,
                 "comparison_runs": comparison_runs,
                 "harvest_datasets": harvest_datasets,
+            }
+        )
+
+    def _handle_preview_query(self, body: dict):
+        entity_ref = (
+            body.get("entity_ref")
+            or body.get("afid")
+            or body.get("ror_id")
+            or body.get("institution_name")
+            or "60104441"
+        )
+        conn = get_connection()
+        entity = find_institution(conn, entity_ref)
+        conn.close()
+
+        q = build_scopus_query(
+            entity_ref=entity or entity_ref,
+            year=body.get("year", "2025"),
+            subj_area=body.get("subj_area", "ALL"),
+            open_access_only=bool(body.get("open_access_only", False)),
+            afid=body.get("afid", ""),
+            ror_id=body.get("ror_id", ""),
+            extra_filter=body.get("extra_filter", ""),
+        )
+        return self._send_json(
+            {
+                "query": q,
+                "entity_uid": entity["entity_uid"] if entity else "",
+                "ror_id": entity["ror_id"] if entity else normalize_ror_id(entity_ref),
+                "afid": entity["afid"] if entity else format_afids(entity_ref),
             }
         )
 
@@ -376,7 +418,7 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
 
         try:
             resp = scopus_api_request(
-                query='AFFIL("Instituto Nacional de Biodiversidad") AND PUBYEAR = 2025',
+                query="AF-ID(60104441) AND PUBYEAR = 2025",
                 api_key=api_key,
                 inst_token=inst_token,
                 view="STANDARD",
@@ -386,31 +428,88 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
             return self._send_json(
                 {
                     "ok": True,
-                    "message": f"Conexión exitosa con Scopus API (Prueba INABIO 2025: {total} resultados).",
+                    "message": f"Conexión exitosa con Scopus API (Prueba AF-ID(60104441) · ROR:0198j4566 · 2025: {total} resultados).",
                 }
             )
         except Exception as exc:
             return self._send_json({"ok": False, "message": str(exc)}, 200)
 
-    def _handle_add_institution(self, body: dict):
-        name = str(body.get("name", "")).strip()
-        if not name:
-            return self._send_json({"error": "El nombre de la institución es obligatorio."}, 400)
-        category = str(body.get("category", "University")).strip()
-        inst_type = str(body.get("inst_type", "Public")).strip()
-        city = str(body.get("city", "")).strip()
+    def _handle_resolve_institution(self, body: dict):
+        settings = get_settings()
+        ror_id = str(body.get("ror_id", "")).strip()
         afid = str(body.get("afid", "")).strip()
+        try:
+            meta = resolve_entity_metadata(
+                ror_id=ror_id,
+                afid=afid,
+                api_key=settings.get("api_key", ""),
+                inst_token=settings.get("inst_token", ""),
+            )
+            return self._send_json({"ok": True, "entity": meta})
+        except Exception as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, 400)
+
+    def _handle_add_institution(self, body: dict):
+        inst_id = body.get("id")
+        ror_id = normalize_ror_id(body.get("ror_id", ""))
+        afid = format_afids(body.get("afid", ""))
+
+        if not ror_id and not afid and not inst_id:
+            return self._send_json(
+                {
+                    "error": "Debes definir la entidad mediante su número Scopus AF-ID (ej. 60104441) o su código ROR (ej. 0198j4566)."
+                },
+                400,
+            )
+
+        name = str(body.get("name", "")).strip()
+        acronym = str(body.get("acronym", "")).strip()
+        category = str(body.get("category", "")).strip()
+        inst_type = str(body.get("inst_type", "")).strip()
+        city = str(body.get("city", "")).strip()
         aliases = str(body.get("aliases", "")).strip()
 
+        # Auto-resolve canonical metadata from ROR / Scopus API when label or city is omitted
+        if (not name or not city) and (ror_id or afid):
+            settings = get_settings()
+            try:
+                resolved = resolve_entity_metadata(
+                    ror_id=ror_id,
+                    afid=afid,
+                    api_key=settings.get("api_key", ""),
+                    inst_token=settings.get("inst_token", ""),
+                )
+                name = name or resolved.get("name", "")
+                acronym = acronym or resolved.get("acronym", "")
+                city = city or resolved.get("city", "")
+                category = category or resolved.get("category", "University")
+                inst_type = inst_type or resolved.get("inst_type", "Public")
+                aliases = aliases or resolved.get("aliases", "")
+                if not afid and resolved.get("afid"):
+                    afid = resolved["afid"]
+            except Exception:
+                pass
+
         conn = get_connection()
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO institutions (name, category, inst_type, city, afid, aliases)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (name, category, inst_type, city, afid, aliases),
-        )
-        conn.commit()
+        try:
+            upsert_institution(
+                conn,
+                {
+                    "id": inst_id,
+                    "ror_id": ror_id,
+                    "afid": afid,
+                    "acronym": acronym,
+                    "name": name,
+                    "category": category or "University",
+                    "inst_type": inst_type or "Public",
+                    "city": city,
+                    "aliases": aliases if aliases else None,
+                },
+                allow_provisional=bool(inst_id),
+            )
+        except ValueError as exc:
+            conn.close()
+            return self._send_json({"error": str(exc)}, 400)
         conn.close()
         return self._handle_bootstrap()
 
@@ -442,10 +541,28 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
         ).fetchall()
         conn.close()
 
-        headers = ["Rank", "Institution", "Category", "Type", "City", "Year", "Subject_Area", "Total_Results", "Scopus_Query"]
+        headers = [
+            "Rank",
+            "Entity_UID",
+            "Scopus_AFID",
+            "ROR_ID",
+            "Acronym",
+            "Institution_Label",
+            "Category",
+            "Type",
+            "City",
+            "Year",
+            "Subject_Area",
+            "Total_Results",
+            "Scopus_Query",
+        ]
         rows = [
             [
                 idx,
+                r["entity_uid"],
+                r["afid"],
+                f"https://ror.org/{r['ror_id']}" if r["ror_id"] else "",
+                r["acronym"],
                 r["institution_name"],
                 r["category"],
                 r["inst_type"],
@@ -482,20 +599,29 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
         conn.close()
 
         headers = [
+            "Entity_UID",
+            "Scopus_AFID",
+            "ROR_ID",
+            "Acronym",
             "Article_Name",
             "Journal_Name",
             "Date_Publication",
             "ISSN_ISBN",
             "Main_Knowledge_Area",
             "Specific_Areas",
-            "Target_Institution_Authors",
+            "Target_Entity_Authors",
             "Authors_List",
             "Affiliations",
             "DOI",
             "Cited_By",
         ]
+        ror_url = f"https://ror.org/{ds['ror_id']}" if ds["ror_id"] else ""
         rows = [
             [
+                ds["entity_uid"],
+                ds["afid"],
+                ror_url,
+                ds["acronym"],
                 p["article_name"],
                 p["journal_name"],
                 p["date_publication"],
@@ -511,9 +637,8 @@ class ScopusStudioHandler(BaseHTTPRequestHandler):
             for p in pubs
         ]
 
-        safe_name = re.sub(
-            r"[^a-zA-Z0-9_-]+", "_", f"Publications_{ds['institution_name'][:25]}_{ds['year']}"
-        )
+        entity_tag = ds["acronym"] or ds["ror_id"] or ds["afid"] or ds["institution_name"][:20]
+        safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "_", f"Publications_{entity_tag}_{ds['year']}")
         if fmt == "xlsx":
             raw = generate_xlsx_bytes("Publications", headers, rows)
             return self._send_bytes(
@@ -550,10 +675,10 @@ def main():
     init_db()
     port = int(os.environ.get("PORT", "7860" if os.environ.get("SPACE_ID") else "8080"))
     server = ThreadingHTTPServer(("0.0.0.0", port), ScopusStudioHandler)
-    print(f"============================================================")
-    print(f" Scopus Scientific Productivity & Visualization Studio")
+    print("============================================================")
+    print(" Scopus Scientific Productivity & Visualization Studio")
     print(f" Server listening at: http://localhost:{port}")
-    print(f"============================================================")
+    print("============================================================")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -563,4 +688,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
